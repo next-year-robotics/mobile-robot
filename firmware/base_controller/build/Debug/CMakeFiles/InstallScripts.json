@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/emjdp/dev/mobile-robot/firmware/base_controller/build/Debug/cmake_install.cmake",
-		"/home/emjdp/dev/mobile-robot/firmware/base_controller/build/Debug/cmake/stm32cubemx/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
