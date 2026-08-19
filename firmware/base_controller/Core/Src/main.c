@@ -18,12 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -34,10 +35,18 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define LD2_TOGGLE_PERIOD_MS 500U
-#ifndef USART2_BAUD_RATE
-#define USART2_BAUD_RATE 115200U
-#endif
+#define LD2_TOGGLE_PERIOD_MS     500U
+#define ENCODER_SAMPLE_PERIOD_MS  10U
+#define TICKS_REPORT_PERIOD_MS    20U  /* 50 Hz */
+
+/* 최악의 줄: "ticks " 6 + uint32 10 + ' ' + int64 20 + ' ' + int64 20 + '\n' = 58 */
+#define TICKS_LINE_CAP            64U
+
+/* 로봇 전진 시 좌우 누적 틱이 모두 +가 되게 하는 보정. 2026-08-20 M2 실측:
+   왼쪽 원시 부호 +, 오른쪽 원시 부호 -. 두 바퀴가 마주 보게 달려 있어 생기는
+   차이이므로 배선이 아니라 여기서 잡는다. */
+#define ENCODER_SIGN_LEFT         (+1)
+#define ENCODER_SIGN_RIGHT        (-1)
 
 /* USER CODE END PD */
 
@@ -49,6 +58,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+/* 로봇 전진 = + 로 보정된 누적 틱. 보정값은 ENCODER_SIGN_* 참고. */
+static int64_t g_ticks_left;
+static int64_t g_ticks_right;
+
+/* 직전 샘플의 카운터. TIM2는 32-bit 하드웨어지만 ARR=65535라 16-bit로 감긴다. */
+static uint16_t g_prev_left;
+static uint16_t g_prev_right;
 
 /* USER CODE END PV */
 
@@ -60,6 +76,71 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/**
+  * @brief  value를 p 바로 앞쪽에 10진수로 쓰고 새 시작 위치를 반환한다.
+  * @note   링커가 nano.specs를 쓰므로 printf 계열은 %lld를 다루지 못한다.
+  *         64-bit 누적 틱은 직접 변환한다.
+  */
+static char *write_i64(char *p, int64_t value)
+{
+  /* INT64_MIN도 부호 반전 없이 다루도록 크기는 부호 없는 타입으로 잡는다. */
+  uint64_t magnitude = (value < 0) ? (~(uint64_t)value + 1U) : (uint64_t)value;
+
+  do
+  {
+    *--p = (char)('0' + (uint32_t)(magnitude % 10U));
+    magnitude /= 10U;
+  } while (magnitude != 0U);
+
+  if (value < 0)
+  {
+    *--p = '-';
+  }
+
+  return p;
+}
+
+/**
+  * @brief  "ticks <ms> <left> <right>\n"을 buf 뒤에서부터 채운다.
+  * @retval 줄의 시작 위치. 길이는 out_length로 돌려준다.
+  */
+static char *build_ticks_line(char *buf, size_t capacity, uint32_t now_ms,
+                              int64_t left, int64_t right, size_t *out_length)
+{
+  static const char tag[] = "ticks ";
+  char *p = buf + capacity;
+
+  *--p = '\n';
+  p = write_i64(p, right);
+  *--p = ' ';
+  p = write_i64(p, left);
+  *--p = ' ';
+  p = write_i64(p, (int64_t)now_ms);
+
+  p -= sizeof(tag) - 1U;
+  memcpy(p, tag, sizeof(tag) - 1U);
+
+  *out_length = (size_t)((buf + capacity) - p);
+  return p;
+}
+
+/**
+  * @brief  좌우 카운터를 읽어 델타를 누적한다.
+  * @note   (int16_t) 캐스팅이 16-bit 랩어라운드를 처리하므로 오버플로를 따로
+  *         추적하지 않는다. 손으로 돌리는 속도에서 10 ms 델타는 ±32767 근처에
+  *         가지 않는다.
+  */
+static void encoder_sample(void)
+{
+  uint16_t now_left = (uint16_t)__HAL_TIM_GET_COUNTER(&htim3);
+  uint16_t now_right = (uint16_t)__HAL_TIM_GET_COUNTER(&htim2);
+
+  g_ticks_left += ENCODER_SIGN_LEFT * (int16_t)(now_left - g_prev_left);
+  g_ticks_right += ENCODER_SIGN_RIGHT * (int16_t)(now_right - g_prev_right);
+
+  g_prev_left = now_left;
+  g_prev_right = now_right;
+}
 
 /* USER CODE END 0 */
 
@@ -70,10 +151,11 @@ void SystemClock_Config(void);
 int main(void)
 {
 
-/* USER CODE BEGIN 1 */
-  char tx_buffer[sizeof("hello 4294967295\n")];
-  uint32_t counter = 0U;
+  /* USER CODE BEGIN 1 */
+  char tx_buffer[TICKS_LINE_CAP];
   uint32_t last_led_toggle_ms;
+  uint32_t last_sample_ms;
+  uint32_t last_report_ms;
 
   /* USER CODE END 1 */
 
@@ -96,16 +178,25 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-#if USART2_BAUD_RATE != 115200U
-  huart2.Init.BaudRate = USART2_BAUD_RATE;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
+  if (HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL) != HAL_OK)
   {
     Error_Handler();
   }
-#endif
+  if (HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* 시작 시점의 카운터를 기준으로 잡아 첫 델타가 0이 되게 한다. */
+  g_prev_left = (uint16_t)__HAL_TIM_GET_COUNTER(&htim3);
+  g_prev_right = (uint16_t)__HAL_TIM_GET_COUNTER(&htim2);
 
   last_led_toggle_ms = HAL_GetTick();
+  last_sample_ms = last_led_toggle_ms;
+  last_report_ms = last_led_toggle_ms;
 
   /* USER CODE END 2 */
 
@@ -114,7 +205,6 @@ int main(void)
   while (1)
   {
     uint32_t now_ms = HAL_GetTick();
-    int tx_length;
 
     if ((uint32_t)(now_ms - last_led_toggle_ms) >= LD2_TOGGLE_PERIOD_MS)
     {
@@ -122,19 +212,27 @@ int main(void)
       HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     }
 
-    tx_length = snprintf(tx_buffer, sizeof(tx_buffer), "hello %lu\n",
-                         (unsigned long)counter);
-    if ((tx_length <= 0) || ((size_t)tx_length >= sizeof(tx_buffer)))
+    if ((uint32_t)(now_ms - last_sample_ms) >= ENCODER_SAMPLE_PERIOD_MS)
     {
-      Error_Handler();
+      last_sample_ms += ENCODER_SAMPLE_PERIOD_MS;
+      encoder_sample();
     }
 
-    if (HAL_UART_Transmit(&huart2, (const uint8_t *)tx_buffer,
-                          (uint16_t)tx_length, HAL_MAX_DELAY) != HAL_OK)
+    if ((uint32_t)(now_ms - last_report_ms) >= TICKS_REPORT_PERIOD_MS)
     {
-      Error_Handler();
+      char *line;
+      size_t length;
+
+      last_report_ms += TICKS_REPORT_PERIOD_MS;
+      line = build_ticks_line(tx_buffer, sizeof(tx_buffer), now_ms,
+                              g_ticks_left, g_ticks_right, &length);
+
+      if (HAL_UART_Transmit(&huart2, (const uint8_t *)line, (uint16_t)length,
+                            HAL_MAX_DELAY) != HAL_OK)
+      {
+        Error_Handler();
+      }
     }
-    counter++;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
