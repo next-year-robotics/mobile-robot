@@ -55,7 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -84,7 +84,13 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+  /* 소프트웨어 워치독은 main 루프가 돌아야 동작한다. 여기로 오면 그게 없으니
+     TIM1 출력을 직접 해제한다. main.c의 Error_Handler와 같은 이유다. */
+  TIM1->CCR1 = 0U;
+  TIM1->CCR2 = 0U;
+  TIM1->CCR3 = 0U;
+  TIM1->CCR4 = 0U;
+  TIM1->BDTR &= ~TIM_BDTR_MOE;
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -197,6 +203,20 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles USART2 global interrupt.
+  */
+void USART2_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART2_IRQn 0 */
+
+  /* USER CODE END USART2_IRQn 0 */
+  HAL_UART_IRQHandler(&huart2);
+  /* USER CODE BEGIN USART2_IRQn 1 */
+
+  /* USER CODE END USART2_IRQn 1 */
+}
 
 /* USER CODE BEGIN 1 */
 
