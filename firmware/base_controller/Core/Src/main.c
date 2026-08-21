@@ -58,7 +58,7 @@
 
 /* 양수 duty = 로봇 전진이 되게 하는 보정. 두 바퀴가 마주 보게 달려 있어 한쪽은
    -1이 될 가능성이 높다. M3.md 5.3에서 실측해 확정한다. 그때까지 잠정값이다. */
-#define MOTOR_SIGN_LEFT           (+1)
+#define MOTOR_SIGN_LEFT           (-1)
 #define MOTOR_SIGN_RIGHT          (+1)
 
 /* 마지막 유효 명령으로부터 이 시간이 지나면 duty 0. 호스트 툴이 죽거나 USB가
