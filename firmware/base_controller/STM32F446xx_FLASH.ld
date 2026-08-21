@@ -64,7 +64,11 @@ _estack = ORIGIN(RAM) + LENGTH(RAM);    /* end of RAM */
 _sstack = _estack - _Min_Stack_Size;
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+/* MSP 전용 스택이다. FreeRTOS 전환 뒤 이 영역은 모든 ISR(TIM6/USART2/TIM7 +
+   HAL_UART_IRQHandler 중첩)과 scheduler 시작 전 main()만 쓴다. task 스택은
+   App/Src/rtos_app.c의 static 배열이라 여기에 포함되지 않는다.
+   여유를 두기 위해 0x400 -> 0x800으로 올렸다 (2026-08-21). */
+_Min_Stack_Size = 0x800; /* required amount of stack */
 
 /* Define output sections */
 SECTIONS

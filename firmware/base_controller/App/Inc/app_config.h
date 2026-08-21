@@ -11,10 +11,44 @@
 
 #include <stdint.h>
 
-/* ---- 주기 (super-loop) ---- */
+/* ---- 주기 ---- */
 #define LD2_TOGGLE_PERIOD_MS      500U
-#define ENCODER_SAMPLE_PERIOD_MS   10U
+#define ENCODER_SAMPLE_PERIOD_MS   10U  /* == CONTROL_PERIOD_MS. ControlTask가 샘플한다. */
 #define TICKS_REPORT_PERIOD_MS     20U  /* 50 Hz */
+
+/* ---- RTOS 실행 구조 ---- */
+
+/* TIM6가 만드는 control tick. .ioc의 TIM6 8399/99(84 MHz/8400/100)와 같아야 한다. */
+#define CONTROL_RATE_HZ           100U
+#define CONTROL_PERIOD_MS          10U
+
+/* native FreeRTOS numeric priority다. FreeRTOSConfig.h의 configMAX_PRIORITIES=56은
+   ST CMSIS-RTOS v2 wrapper의 compile-time 요구값일 뿐이고 아래 값과 무관하다. */
+#define TASK_PRIO_CONTROL           5U
+#define TASK_PRIO_HEALTH            4U
+#define TASK_PRIO_LEGACY_IO         2U
+
+/* 길이 단위는 StackType_t **word**다 (1 word = 4 B). CMSIS osThreadAttr_t의
+   stack_size는 **byte**라 값이 다르다 — 이 프로젝트는 task를 native
+   xTaskCreateStatic으로만 만들므로 전부 word로 읽는다. */
+#define TASK_STACK_WORDS_CONTROL   384U  /* 1,536 B */
+#define TASK_STACK_WORDS_HEALTH    256U  /* 1,024 B */
+#define TASK_STACK_WORDS_IO        512U  /* 2,048 B */
+#define TASK_STACK_WORDS_IDLE      256U  /* 1,024 B */
+
+#define HEALTH_PERIOD_MS           50U
+
+/* LegacyIoTask는 개행 notification으로 깨어난다. 이 timeout은 telemetry/워치독
+   통지/재무장을 위한 그물이며, 명령 지연이 아니라 주기 작업의 jitter 상한이다. */
+#define LEGACY_IO_POLL_MS           2U
+
+/* ControlTask가 명령을 반영하고 결과를 돌려줄 때까지 기다리는 **상한**.
+   ControlTask는 최고 우선순위라 정상적으로는 게시 즉시 선점해 결과가 이미 와 있다.
+   이 시간을 넘기면 적용 근거가 없으므로 ok가 아니라 err다. */
+#define CMD_APPLY_TIMEOUT_MS       30U
+
+/* HealthTask가 control heartbeat 정체로 보는 한계. 관측만 하고 IWDG는 켜지 않는다. */
+#define HEALTH_HEARTBEAT_STALL_MS 100U
 
 /* ---- 엔코더 ---- */
 
@@ -95,5 +129,15 @@ _Static_assert((ENCODER_SIGN_RIGHT == 1) || (ENCODER_SIGN_RIGHT == -1),
 _Static_assert(MOTOR_DUTY_MAX_PM > 0, "MOTOR_DUTY_MAX_PM은 양수여야 한다");
 _Static_assert(CMD_POLL_MAX_BYTES > 0U && CMD_POLL_MAX_LINES > 0U,
                "command_poll 상한이 0이면 명령이 영영 처리되지 않는다");
+_Static_assert(ENCODER_SAMPLE_PERIOD_MS == CONTROL_PERIOD_MS,
+               "엔코더 샘플은 ControlTask cycle에서만 일어난다");
+_Static_assert(TASK_PRIO_CONTROL > TASK_PRIO_HEALTH,
+               "ControlTask가 HealthTask보다 낮으면 통신/관측이 제어를 막을 수 있다");
+_Static_assert(TASK_PRIO_HEALTH > TASK_PRIO_LEGACY_IO,
+               "LegacyIoTask는 가장 낮아야 한다 — UART 블로킹 송신이 여기서 일어난다");
+_Static_assert(CMD_APPLY_TIMEOUT_MS >= (3U * CONTROL_PERIOD_MS),
+               "적용 대기 상한이 control cycle 몇 번보다 짧으면 정상 명령이 err가 된다");
+_Static_assert(CMD_WATCHDOG_MS > CONTROL_PERIOD_MS,
+               "워치독이 control 주기보다 짧으면 명령이 반영되기 전에 만료된다");
 
 #endif /* APP_CONFIG_H */

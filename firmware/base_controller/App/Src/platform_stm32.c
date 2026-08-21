@@ -45,6 +45,8 @@ void platform_motor_write(const motor_ccr_t *out)
   platform_critical_exit(state);
 }
 
+/* 남은 call site는 platform_motor_kill() 내부 하나뿐이다(2026-08-21 감사).
+   RX 손상 ISR이 여기를 직접 부르던 경로는 urgent STOP 이벤트로 대체했다. */
 void platform_motor_zero(void)
 {
   TIM1->CCR1 = 0U;
@@ -69,6 +71,27 @@ void platform_motor_kill(void)
 uint32_t platform_now_ms(void)
 {
   return HAL_GetTick();
+}
+
+uint32_t platform_dwt_cycles(void)
+{
+  return DWT->CYCCNT;
+}
+
+/**
+  * @brief  DWT cycle counter를 켠다. scheduler 전에 한 번만 부른다.
+  * @note   Cortex-M4에는 CM7의 DWT lock access register가 없다. TRCENA만 세우면 된다.
+  */
+static void platform_dwt_init(void)
+{
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0U;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+bool platform_control_timer_start(void)
+{
+  return HAL_TIM_Base_Start_IT(&htim6) == HAL_OK;
 }
 
 uint16_t platform_encoder_left_count(void)
@@ -159,7 +182,12 @@ bool platform_init(void)
     return false;
   }
 
-  return platform_uart_rx_arm();
+  /* control WCET/wake latency 계측의 시간 기준. scheduler 전에 한 번만 켠다. */
+  platform_dwt_init();
+
+  /* USART2 수신 무장과 TIM6 기동은 여기서 하지 않는다. 두 인터럽트 모두 task를
+     깨우므로 handle과 static 객체가 생긴 뒤, 각 소유 task의 첫머리에서 시작한다. */
+  return true;
 }
 
 /**

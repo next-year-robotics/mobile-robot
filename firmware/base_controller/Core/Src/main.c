@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "app_main.h"
 #include "platform_stm32.h"
+#include "rtos_app.h"
 
 /* USER CODE END Includes */
 
@@ -101,7 +102,9 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
-  /* TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, UART 수신 무장까지 여기서 끝난다. */
+  /* TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, DWT 활성화까지 여기서 끝난다.
+     인터럽트 원(USART2 RX, TIM6)은 여기서 켜지 않는다 — task handle과 static
+     mailbox가 생긴 뒤 각 소유 task의 첫머리에서 시작한다. */
   if (!app_init())
   {
     Error_Handler();
@@ -122,7 +125,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    app_step();
+    /* scheduler가 돌아왔다는 것은 커널을 시작하지 못했다는 뜻이다. M3 super-loop는
+       ControlTask/LegacyIoTask로 옮겨 갔으므로 여기서 app_step()을 부르지 않는다.
+       모터를 끊고 멈춘다. */
+    Error_Handler();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

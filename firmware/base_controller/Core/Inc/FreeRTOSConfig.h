@@ -153,7 +153,12 @@ See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
 /* USER CODE BEGIN 1 */
-#define configASSERT( x ) if ((x) == 0) {taskDISABLE_INTERRUPTS(); for( ;; );}
+/* configASSERT는 ISR priority 오류(vPortValidateInterruptPriority)와 커널 내부
+   불변식 위반을 잡는다. 여기서 멈추는 순간 모터가 돌고 있을 수 있으므로 먼저
+   TIM1 출력을 끊는다. rtos_app_fatal()은 lock-free/allocation-free이며 HAL
+   블로킹 API를 쓰지 않는다. */
+extern void rtos_app_fatal(void);
+#define configASSERT( x ) if ((x) == 0) { rtos_app_fatal(); }
 /* USER CODE END 1 */
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
@@ -167,6 +172,45 @@ standard names. */
 
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+
+/* ------------------------------------------------------------------------ */
+/* static-allocation 전용 전환 (2026-08-21)                                   */
+/*                                                                          */
+/* 위쪽 값들은 CubeMX가 .ioc에서 생성하는 영역이라 직접 고치면 재생성 때 되돌아간다. */
+/* 그래서 최종값은 재생성에도 살아남는 이 USER CODE 구간에서 덮는다.             */
+/* CubeMX에서 다시 Generate Code를 하기 전에 .ioc 쪽 FreeRTOS 설정도 아래와 같이  */
+/* 맞춰 두어야 생성 결과와 최종 image가 일치한다.                                */
+/* ------------------------------------------------------------------------ */
+
+/* 동적 할당 경로를 없앤다. heap_4.c는 root CMakeLists.txt 사용자 영역에서 링크
+   대상에서 제외했고, 그 파일 자체가 이 값이 0이면 #error로 빌드를 세운다. */
+#undef  configSUPPORT_DYNAMIC_ALLOCATION
+#define configSUPPORT_DYNAMIC_ALLOCATION      0
+#undef  configTOTAL_HEAP_SIZE
+#undef  USE_FreeRTOS_HEAP_4
+
+/* 쓰지 않는다. 재귀 뮤텍스가 필요해지는 설계는 이 단계의 범위가 아니다. */
+#undef  configUSE_RECURSIVE_MUTEXES
+#define configUSE_RECURSIVE_MUTEXES           0
+
+/* 생성 기본값에 없어 FreeRTOS.h 기본값으로 흘러가던 항목을 명시한다. */
+#define configUSE_TICKLESS_IDLE               0
+#define configUSE_TASK_NOTIFICATIONS          1
+#define configUSE_QUEUE_SETS                  0
+#define configUSE_TIME_SLICING                1
+#define configUSE_NEWLIB_REENTRANT            0
+
+/* HealthTask가 idle/timer task의 stack high-water mark를 읽는다. */
+#define INCLUDE_xTaskGetIdleTaskHandle        1
+
+/* ST CMSIS-RTOS v2 wrapper에서 pvPortMalloc을 부르는 API를 컴파일 단계에서 없앤다.
+   이 프로젝트는 두 API를 모두 쓰지 않으며, 남겨 두면 static-only image에 동적
+   할당 참조가 되살아난다. wrapper 파일 자체는 손대지 않는다. */
+#undef  configUSE_OS2_THREAD_ENUMERATE
+#define configUSE_OS2_THREAD_ENUMERATE        0
+#undef  configUSE_OS2_TIMER
+#define configUSE_OS2_TIMER                   0
+
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

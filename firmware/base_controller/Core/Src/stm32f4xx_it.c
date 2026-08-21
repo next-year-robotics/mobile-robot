@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "platform_stm32.h"
+#include "rtos_app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -192,7 +193,16 @@ void USART2_IRQHandler(void)
 void TIM6_DAC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
-
+  /* 100 Hz control tick. 여기서 하는 일은 update flag 확인/clear, tick sequence
+     증가, DWT timestamp 저장, ControlTask direct notification, PendSV 예약이
+     전부다. 파싱도 계산도 logging도 하지 않는다.
+     플래그를 여기서 지우므로 아래 HAL_TIM_IRQHandler는 어떤 콜백도 부르지 않는다
+     (TIM7 HAL timebase의 PeriodElapsed 경로와 섞이지 않게 하려는 것이기도 하다). */
+  if ((TIM6->SR & TIM_SR_UIF) != 0U)
+  {
+    TIM6->SR = ~TIM_SR_UIF;
+    rtos_app_on_control_tick_isr();
+  }
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
