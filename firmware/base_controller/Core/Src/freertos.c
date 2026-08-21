@@ -25,7 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "platform_stm32.h"
+#include "rtos_app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,25 +49,16 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-uint32_t defaultTaskBuffer[ 128 ];
-osStaticThreadDef_t defaultTaskControlBlock;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .cb_mem = &defaultTaskControlBlock,
-  .cb_size = sizeof(defaultTaskControlBlock),
-  .stack_mem = &defaultTaskBuffer[0],
-  .stack_size = sizeof(defaultTaskBuffer),
-  .priority = (osPriority_t) osPriorityNormal,
-};
+/* CubeMX가 만들던 static defaultTask는 제거했다. application task는 전부
+   App/Src/rtos_app.c가 native xTaskCreateStatic으로 만든다.
+   -- 재생성 주의: CubeMX에서 Generate Code를 다시 하면 여기에 defaultTask 정의와
+      MX_FREERTOS_Init()의 osThreadNew() 호출이 되살아난다. 먼저 .ioc의
+      FreeRTOS > Tasks에서 defaultTask를 지워야 한다. */
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 
 /* USER CODE END FunctionPrototypes */
-
-void StartDefaultTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -77,15 +69,21 @@ void vApplicationMallocFailedHook(void);
 /* USER CODE BEGIN 4 */
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 {
-   /* Run time stack overflow checking is performed if
-   configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
-   called if a stack overflow is detected. */
+  /* configCHECK_FOR_STACK_OVERFLOW=2로 켜져 있다. 여기 왔다는 것은 어느 task의
+     상태든 믿을 수 없다는 뜻이므로, 돌아가지 않고 모터부터 끊는다. */
+  (void)xTask;
+  (void)pcTaskName;
+  rtos_app_fatal();
 }
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN 5 */
+/* configSUPPORT_DYNAMIC_ALLOCATION=0인 최종 image에는 pvPortMalloc 자체가 없으므로
+   이 hook으로 오는 경로도 없다. 생성 설정을 보존하되, 만에 하나 동적 할당 경로가
+   되살아나면 조용히 넘어가지 않고 모터를 끊고 멈추게 둔다. */
 void vApplicationMallocFailedHook(void)
 {
+  rtos_app_fatal();
    /* vApplicationMallocFailedHook() will only be called if
    configUSE_MALLOC_FAILED_HOOK is set to 1 in FreeRTOSConfig.h. It is a hook
    function that will get called if a call to pvPortMalloc() fails.
@@ -125,36 +123,16 @@ void MX_FREERTOS_Init(void) {
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  /* application task와 mailbox는 전부 여기서 static으로 만든다. 이 호출이 끝난
+     뒤에야 TIM6/USART2 인터럽트가 켜지므로, handle 없는 ISR이 뜰 수 없다. */
+  rtos_app_init();
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
 
-}
-
-/* USER CODE BEGIN Header_StartDefaultTask */
-/**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
-{
-  /* USER CODE BEGIN StartDefaultTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartDefaultTask */
 }
 
 /* Private application code --------------------------------------------------*/

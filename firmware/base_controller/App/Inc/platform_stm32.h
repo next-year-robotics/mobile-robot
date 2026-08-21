@@ -16,12 +16,28 @@
 #include "motor_output.h"
 
 /**
-  * @brief  TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, UART 수신 무장.
+  * @brief  TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, DWT cycle counter 활성화.
+  * @note   **인터럽트 원을 하나도 켜지 않는다.** scheduler가 서기 전에 task handle이
+  *         없는 ISR이 뜨는 것을 막기 위해 UART 수신 무장과 TIM6 기동은 각 소유
+  *         task의 첫머리로 옮겼다.
   * @retval 하나라도 실패하면 false. 호출자는 Error_Handler()로 간다.
   */
 bool platform_init(void);
 
+/**
+  * @brief  TIM6 100 Hz control tick 인터럽트를 시작한다.
+  * @note   **ControlTask handle과 static 객체가 전부 준비된 뒤에만** 부른다.
+  *         호출자는 ControlTask 자신이다.
+  */
+bool platform_control_timer_start(void);
+
 uint32_t platform_now_ms(void);
+
+/**
+  * @brief  DWT cycle counter. platform_init()에서 scheduler 전에 한 번 켠다.
+  * @note   wrap-safe uint32 뺄셈으로만 쓴다. 84 MHz에서 약 51 s마다 감긴다.
+  */
+uint32_t platform_dwt_cycles(void);
 
 /**
   * @brief  네 CCR을 기록한다. **정상 경로에서 TIM1 CCR을 쓰는 유일한 지점이다.**
@@ -31,9 +47,13 @@ uint32_t platform_now_ms(void);
 void platform_motor_write(const motor_ccr_t *out);
 
 /**
-  * @brief  복구 가능한 통신 손상에서 네 CCR만 즉시 0으로 만든다.
-  * @note   ISR-safe, allocation/lock/blocking-free. MOE는 유지하므로 parser가 newline에
-  *         재동기화된 뒤 새 정상 명령으로 운전을 재개할 수 있다.
+  * @brief  네 CCR만 즉시 0으로 만든다. MOE는 유지한다.
+  * @note   RTOS 전환 뒤 **허용된 call site는 platform_motor_kill() 내부뿐이다.**
+  *         복구 가능한 RX 손상에서 ISR이 직접 CCR을 쓰던 경로는 없앴다 — 이제 ISR은
+  *         ControlTask에 urgent STOP을 걸고, 최고 우선순위인 ControlTask가
+  *         platform_motor_write()로 0을 반영한다. 정상 경로의 TIM1 소유자를 하나로
+  *         유지하기 위한 규칙이다.
+  *         ISR-safe, allocation/lock/blocking-free인 성질은 그대로 유지한다.
   */
 void platform_motor_zero(void);
 
@@ -54,6 +74,12 @@ uint16_t platform_encoder_right_count(void);
 bool platform_uart_send(const char *data, size_t length);
 
 bool platform_uart_rx_is_armed(void);
+
+/**
+  * @brief  USART2 수신 인터럽트를 무장한다.
+  * @note   **LegacyIoTask가 유일한 소유자다.** scheduler 시작 뒤 그 task의 첫머리에서
+  *         처음 무장하고, 이후 재무장도 같은 task와 RX/Error callback에서만 한다.
+  */
 bool platform_uart_rx_arm(void);
 
 /** 짧은 ISR/main 공유 상태 갱신용 critical section. 반환값은 이전 PRIMASK다. */
