@@ -1,8 +1,10 @@
 #include "protocol_ascii.h"
 
+#include <stddef.h>
 #include <string.h>
 
-/* per-mille 지령이라 여섯 자리를 넘길 일이 없다. 넘치면 실패로 본다. */
+/* per-mille 지령(<= 4자리)과 tps 지령(<= 4자리)이라 여섯 자리를 넘길 일이 없다.
+   넘치면 실패로 본다. */
 #define PARSE_MAX_DIGITS  6
 
 /**
@@ -56,6 +58,26 @@ static bool parse_i32(const char **cursor, int32_t *out)
   return true;
 }
 
+/**
+  * @brief  남은 꼬리가 공백뿐인지 검사한다.
+  * @note   "duty 1 2 3"을 거절하는 지점이다. 값을 다 읽었다고 줄이 유효한 것이 아니다.
+  */
+static bool at_end(const char *p)
+{
+  while (*p == ' ')
+  {
+    p++;
+  }
+  return *p == '\0';
+}
+
+/** @brief "<tag> " 또는 "<tag>" 로 시작하는지 본다. */
+static bool head_is(const char *p, const char *tag, size_t tag_len)
+{
+  return (strncmp(p, tag, tag_len) == 0) &&
+         ((p[tag_len] == ' ') || (p[tag_len] == '\0'));
+}
+
 bool protocol_parse_line(const char *line, proto_command_t *out)
 {
   const char *p = line;
@@ -63,30 +85,42 @@ bool protocol_parse_line(const char *line, proto_command_t *out)
   int32_t right = 0;
 
   out->kind = PROTO_CMD_NONE;
-  out->left_pm = 0;
-  out->right_pm = 0;
+  out->left = 0;
+  out->right = 0;
 
-  if ((strncmp(p, "duty", 4) == 0) && ((p[4] == ' ') || (p[4] == '\0')))
+  if (head_is(p, "duty", 4U) || head_is(p, "vel", 3U))
   {
-    p += 4;
-    if (!parse_i32(&p, &left) || !parse_i32(&p, &right))
+    bool is_vel = (*p == 'v');
+
+    p += is_vel ? 3 : 4;
+    if (!parse_i32(&p, &left) || !parse_i32(&p, &right) || !at_end(p))
     {
       return false;
     }
 
-    /* 꼬리 문자까지 검사한다. "duty 1 2 3"은 거절이다. */
-    while (*p == ' ')
-    {
-      p++;
-    }
-    if (*p != '\0')
+    out->kind = is_vel ? PROTO_CMD_VEL : PROTO_CMD_DUTY;
+    out->left = left;
+    out->right = right;
+    return true;
+  }
+
+  if (head_is(p, "spd", 3U))
+  {
+    p += 3;
+    if (!parse_i32(&p, &left) || !at_end(p))
     {
       return false;
     }
 
-    out->kind = PROTO_CMD_DUTY;
-    out->left_pm = left;
-    out->right_pm = right;
+    /* 0과 1 이외는 거절이다. "켜짐"의 표현을 하나로 유지한다. */
+    if ((left != 0) && (left != 1))
+    {
+      return false;
+    }
+
+    out->kind = PROTO_CMD_SPD;
+    out->left = left;
+    out->right = left;
     return true;
   }
 

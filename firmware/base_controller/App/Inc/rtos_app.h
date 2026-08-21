@@ -55,6 +55,22 @@ typedef struct
   uint32_t health_stall_events;
   uint32_t health_max_stall_ms;
   uint32_t health_refresh_allowed;    /* 향후 IWDG refresh 판정. 지금은 기록만 한다. */
+
+  /* ---- 속도 폐루프 계측 (M4) ----
+     "계측은 와이어가 아니라 SWD로"가 뼈대 단계에서 세운 원칙이다. 목표/적분기/
+     포화는 여기서만 본다. 전부 정수이며 적분기는 ‰ x 1000으로 싣는다. */
+  uint32_t closed_loop;               /* 현재 모드 (0 개루프 / 1 폐루프) */
+  uint32_t last_feed_ms;              /* 마지막으로 워치독을 먹인 시각 */
+  int32_t  target_tps_left;
+  int32_t  target_tps_right;
+  int32_t  measured_tps_left;
+  int32_t  measured_tps_right;
+  int32_t  duty_left_pm;              /* 실제로 CCR에 실린 duty */
+  int32_t  duty_right_pm;
+  int32_t  integrator_left_mpm;       /* 적분기 ‰ x 1000 */
+  int32_t  integrator_right_mpm;
+  uint32_t saturated_left;            /* 클램프 전 duty가 범위를 벗어났는가 */
+  uint32_t saturated_right;
 } rtos_metrics_t;
 
 extern rtos_metrics_t g_rtos_metrics;

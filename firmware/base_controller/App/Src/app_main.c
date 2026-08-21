@@ -35,6 +35,10 @@ static char g_tx_buffer[TX_LINE_CAP];
 
 static uint32_t g_last_report_ms;
 
+/* `spd` 텔레메트리 스위치. **기본 꺼짐이다** — M3 회귀(`motor_sweep.py`)는 이 줄을
+   의도적으로 해석하지 않으므로, 실수로 기본 활성화하면 wire 회귀가 반드시 실패한다. */
+static bool g_spd_enabled;
+
 /* ControlTask status에서 관측한 워치독 만료 edge. 변화가 보일 때만 `wd` 한 줄이 나간다. */
 static uint32_t g_wd_seq_seen;
 
@@ -211,10 +215,25 @@ static void rx_rearm_if_needed(void)
   }
 }
 
+/** @brief ASCII 명령 종류를 ControlTask의 지령 종류로 옮긴다. */
+static control_cmd_kind_t control_kind_of(proto_cmd_kind_t kind)
+{
+  if (kind == PROTO_CMD_DUTY)
+  {
+    return CONTROL_CMD_DUTY;
+  }
+  if (kind == PROTO_CMD_VEL)
+  {
+    return CONTROL_CMD_VEL;
+  }
+  return CONTROL_CMD_STOP;
+}
+
 /**
   * @brief  수락된 명령을 ControlTask에 넘기고 **적용 결과를 받은 뒤에만** ACK한다.
-  * @note   `ok`는 "queue에 넣었다"가 아니라 "이 sequence의 duty가 CCR에 실렸다"는
+  * @note   `ok`는 "queue에 넣었다"가 아니라 "이 sequence의 값이 CCR에 반영됐다"는
   *         뜻이다. 그래서 stop도 출력이 0이 된 뒤에 ACK된다.
+  *         `spd`만 예외다 — ControlTask로 가지 않는 설정 명령이라 여기서 끝난다.
   */
 static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
 {
@@ -225,10 +244,10 @@ static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
   int64_t values[3];
   uint32_t critical_state;
 
-  out.seq = ++g_cmd_seq;
-  out.left_pm = cmd->left_pm;
-  out.right_pm = cmd->right_pm;
-  out.is_stop = (cmd->kind != PROTO_CMD_DUTY);
+  out.seq = g_cmd_seq + 1U;
+  out.kind = control_kind_of(cmd->kind);
+  out.left = cmd->left;
+  out.right = cmd->right;
   out.accepted_ms = now_ms;
   out.deadline_ms = now_ms + CMD_WATCHDOG_MS;
 
@@ -243,6 +262,22 @@ static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
     return;
   }
   platform_critical_exit(critical_state);
+
+  if (cmd->kind == PROTO_CMD_SPD)
+  {
+    /* 설정 명령이다. **워치독을 먹이지 않는다** — 설정을 반복해서 모터를 계속
+       살려두는 경로를 만들지 않는다. ControlTask의 mailbox에도 들어가지 않으므로
+       command sequence도 소비하지 않는다.
+       ACK 형식은 그대로 두고 상태값 하나를 두 번 싣는다. */
+    g_spd_enabled = (cmd->left != 0);
+    values[0] = (int64_t)now_ms;
+    values[1] = (int64_t)cmd->left;
+    values[2] = (int64_t)cmd->left;
+    send_line("ok", values, 3U);
+    return;
+  }
+
+  g_cmd_seq = out.seq;
 
   if (!app_link_post_command(&out))
   {
@@ -260,8 +295,8 @@ static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
   {
     case CONTROL_ACK_OK:
       values[0] = (int64_t)result.applied_ms;
-      values[1] = (int64_t)result.left_pm;
-      values[2] = (int64_t)result.right_pm;
+      values[1] = (int64_t)result.left;
+      values[2] = (int64_t)result.right;
       send_line("ok", values, 3U);
       return;
 
@@ -355,6 +390,7 @@ bool app_init(void)
   g_cmd_rejected_count = 0U;
   g_cmd_seq = 0U;
   g_wd_seq_seen = 0U;
+  g_spd_enabled = false;
 
   if (!platform_init())
   {
@@ -401,13 +437,25 @@ void app_step(void)
   /* 5. 50 Hz 텔레메트리. 누적 int64 의미를 그대로 유지한다. */
   if ((uint32_t)(now_ms - g_last_report_ms) >= TICKS_REPORT_PERIOD_MS)
   {
-    int64_t values[3];
+    int64_t values[5];
 
     g_last_report_ms += TICKS_REPORT_PERIOD_MS;
     values[0] = (int64_t)now_ms;
     values[1] = status.ticks_left;
     values[2] = status.ticks_right;
     send_line("ticks", values, 3U);
+
+    /* 튜닝용 스트림. 목표와 포화 플래그는 넣지 않는다 — 목표는 ok가 이미
+       알려줬고, 적분기와 포화는 SWD로 g_rtos_metrics에서 본다. 값을 늘리면
+       최악 줄이 TX_LINE_CAP을 넘어 UART_TX_TIMEOUT_MS 여유까지 다시 잡아야 한다. */
+    if (g_spd_enabled)
+    {
+      values[1] = (int64_t)status.measured_tps_left;
+      values[2] = (int64_t)status.duty_left_pm;
+      values[3] = (int64_t)status.measured_tps_right;
+      values[4] = (int64_t)status.duty_right_pm;
+      send_line("spd", values, 5U);
+    }
   }
 }
 
