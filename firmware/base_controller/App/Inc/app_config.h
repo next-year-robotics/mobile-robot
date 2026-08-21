@@ -44,6 +44,37 @@
 #define IWDG_STALL_TEST              0
 #endif
 
+/* HIL 전용 build option. CMake의 -DU3_SMOKE_TEST=ON일 때만 SmokeTask와 u3_smoke.c가
+   들어간다. M5.md 6절(양방향 smoke)과 7절(보드레이트 스윕) 전용이며, production
+   image에는 USART1로 한 바이트도 나가지 않는다. */
+#ifndef U3_SMOKE_TEST
+#define U3_SMOKE_TEST                0
+#endif
+
+/* SmokeTask는 **가장 낮은 우선순위**다. 시험 트래픽이 제어·관측·레거시 IO 중 어느
+   것도 지연시킬 수 없어야 6절의 "제어는 그대로"라는 전제가 성립한다. */
+#define TASK_PRIO_SMOKE             1U
+#define TASK_STACK_WORDS_SMOKE    384U  /* 1,536 B */
+
+/* USART1 DMA 링을 긁는 주기. 보드레이트가 올라가도 이 주기만 지키면 링이 넘치지 않는다. */
+#define U3_SMOKE_POLL_MS            1U
+
+/* T 스트림 주기. `/joint_states` 계약과 같은 50 Hz로 두어 실제 부하를 흉내 낸다. */
+#define U3_STREAM_PERIOD_MS        20U
+
+/* 한 주기에 긁어 갈 최대 바이트. 3 Mbaud의 1 ms 분량(약 300 B)보다 커야 한다. */
+#define U3_SMOKE_READ_CHUNK       512U
+
+/* 7절 스윕 안전망. 보드레이트를 바꾼 뒤 이 시간 안에 유효한 줄이 하나도 오지 않으면
+   기본 속도로 되돌린다. 되돌리지 않으면 실패한 스윕 단계마다 보드 리셋이 필요하다.
+
+   **`.ioc`의 `USART1.BaudRate`와 같아야 한다.** 갈리면 자동 복귀가 엉뚱한 속도로 가서
+   링크가 살아나지 않는다. 2026-08-22 확정값은 921600이며 근거는 M5.md 7절이다. */
+#define U3_BAUD_DEFAULT        921600U
+#define U3_BAUD_REVERT_MS        5000U
+/* ACK를 보낸 뒤 호스트가 자기 포트를 다시 여는 데 주는 시간. */
+#define U3_BAUD_ACK_SETTLE_MS      50U
+
 /* LegacyIoTask는 개행 notification으로 깨어난다. 이 timeout은 telemetry/워치독
    통지/재무장을 위한 그물이며, 명령 지연이 아니라 주기 작업의 jitter 상한이다. */
 #define LEGACY_IO_POLL_MS           2U
@@ -195,6 +226,12 @@ _Static_assert(TASK_PRIO_CONTROL > TASK_PRIO_HEALTH,
                "ControlTask가 HealthTask보다 낮으면 통신/관측이 제어를 막을 수 있다");
 _Static_assert(TASK_PRIO_HEALTH > TASK_PRIO_LEGACY_IO,
                "LegacyIoTask는 가장 낮아야 한다 — UART 블로킹 송신이 여기서 일어난다");
+_Static_assert(TASK_PRIO_LEGACY_IO > TASK_PRIO_SMOKE,
+               "SmokeTask가 LegacyIoTask보다 높으면 시험 트래픽이 명령/텔레메트리를 밀어낸다");
+_Static_assert(TASK_PRIO_SMOKE > 0U,
+               "SmokeTask가 idle 우선순위면 T 스트림이 굶는다");
+_Static_assert(U3_STREAM_PERIOD_MS >= U3_SMOKE_POLL_MS,
+               "T 스트림 주기가 poll 주기보다 짧으면 한 주기에 두 줄이 밀린다");
 _Static_assert(CMD_APPLY_TIMEOUT_MS >= (3U * CONTROL_PERIOD_MS),
                "적용 대기 상한이 control cycle 몇 번보다 짧으면 정상 명령이 err가 된다");
 _Static_assert(CMD_WATCHDOG_MS > CONTROL_PERIOD_MS,

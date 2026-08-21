@@ -51,6 +51,7 @@ typedef struct
   uint32_t stack_free_io_words;
   uint32_t stack_free_idle_words;
   uint32_t stack_free_timer_words;
+  uint32_t stack_free_smoke_words;    /* U3_SMOKE_TEST build에서만 갱신된다 */
 
   uint32_t health_stall_events;
   uint32_t health_max_stall_ms;
