@@ -9,12 +9,40 @@
 #include "app_config.h"
 #include "app_main.h"
 
+#include "iwdg.h"
 #include "main.h"
 #include "tim.h"
 #include "usart.h"
 
 /* USART2 수신 인터럽트가 한 바이트씩 채우는 자리. */
 static uint8_t s_rx_byte;
+static uint32_t s_boot_reset_flags;
+
+void platform_boot_snapshot_reset_flags(void)
+{
+  const uint32_t reset_mask = RCC_CSR_LPWRRSTF | RCC_CSR_WWDGRSTF |
+                              RCC_CSR_IWDGRSTF | RCC_CSR_SFTRSTF |
+                              RCC_CSR_PORRSTF | RCC_CSR_PINRSTF |
+                              RCC_CSR_BORRSTF;
+
+  s_boot_reset_flags = RCC->CSR & reset_mask;
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+}
+
+uint32_t platform_boot_reset_flags(void)
+{
+  return s_boot_reset_flags;
+}
+
+bool platform_boot_was_iwdg_reset(void)
+{
+  return (s_boot_reset_flags & RCC_CSR_IWDGRSTF) != 0U;
+}
+
+bool platform_iwdg_refresh(void)
+{
+  return HAL_IWDG_Refresh(&hiwdg) == HAL_OK;
+}
 
 /**
   * @brief  한 채널의 두 CCR을 안전한 순서로 기록한다.

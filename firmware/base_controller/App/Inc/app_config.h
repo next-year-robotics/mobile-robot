@@ -38,6 +38,12 @@
 
 #define HEALTH_PERIOD_MS           50U
 
+/* HIL 전용 build option. 평소에는 0이며, CMake의 -DIWDG_STALL_TEST=ON일 때만
+   ControlTask 정지 주입 hook을 컴파일한다. */
+#ifndef IWDG_STALL_TEST
+#define IWDG_STALL_TEST              0
+#endif
+
 /* LegacyIoTask는 개행 notification으로 깨어난다. 이 timeout은 telemetry/워치독
    통지/재무장을 위한 그물이며, 명령 지연이 아니라 주기 작업의 jitter 상한이다. */
 #define LEGACY_IO_POLL_MS           2U
@@ -47,7 +53,7 @@
    이 시간을 넘기면 적용 근거가 없으므로 ok가 아니라 err다. */
 #define CMD_APPLY_TIMEOUT_MS       30U
 
-/* HealthTask가 control heartbeat 정체로 보는 한계. 관측만 하고 IWDG는 켜지 않는다. */
+/* HealthTask가 control heartbeat 정체로 보고 IWDG refresh를 중단하는 한계. */
 #define HEALTH_HEARTBEAT_STALL_MS 100U
 
 /* ---- 엔코더 ---- */

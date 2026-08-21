@@ -23,6 +23,13 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "IWDG-Stall",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "IWDG_STALL_TEST": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -33,6 +40,10 @@
         {
             "name": "Release",
             "configurePreset": "Release"
+        },
+        {
+            "name": "IWDG-Stall",
+            "configurePreset": "IWDG-Stall"
         }
     ]
 }

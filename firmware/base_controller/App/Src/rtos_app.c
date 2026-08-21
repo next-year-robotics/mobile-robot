@@ -37,6 +37,7 @@
 rtos_metrics_t g_rtos_metrics;
 volatile uint32_t g_control_tick_seq;
 volatile uint32_t g_control_tick_cycles;
+volatile uint32_t g_iwdg_test_stall_control;
 
 /* ------------------------------------------------------------------------- */
 /* static RTOS 객체                                                           */
@@ -316,6 +317,19 @@ static void control_task(void *argument)
       continue;
     }
 
+#if IWDG_STALL_TEST
+    /* HIL fault injection. SWD halt 중에는 IWDG가 freeze되므로 flag를 쓴 뒤 resume한다.
+       마지막 PWM을 남기지 않도록 먼저 hardware 출력을 끊고 ControlTask만 멈춘다.
+       HealthTask는 계속 돌아 heartbeat 정체를 판정한 뒤 refresh를 중단한다. */
+    if (g_iwdg_test_stall_control != 0U)
+    {
+      g_rtos_metrics.iwdg_test_stall_seen = 1U;
+      platform_motor_kill();
+      vTaskSuspend(NULL);
+      continue;
+    }
+#endif
+
     entry_cycles = platform_dwt_cycles();
     now_ms = platform_now_ms();
 
@@ -400,6 +414,24 @@ static void health_collect_stacks(void)
       (uint32_t)uxTaskGetStackHighWaterMark(xTimerGetTimerDaemonTaskHandle());
 }
 
+static void health_iwdg_refresh(void)
+{
+  uint32_t refresh_ms = platform_now_ms();
+
+  if (!platform_iwdg_refresh())
+  {
+    g_rtos_metrics.iwdg_refresh_fail_count++;
+    rtos_app_fatal();
+  }
+
+  if (g_rtos_metrics.iwdg_refresh_count == 0U)
+  {
+    /* IWDG는 boot 도중에 시작되므로 boot tick은 시작->첫 refresh의 보수적 상한이다. */
+    g_rtos_metrics.iwdg_first_refresh_ms = refresh_ms;
+  }
+  g_rtos_metrics.iwdg_refresh_count++;
+}
+
 static void health_task(void *argument)
 {
   TickType_t last_wake = xTaskGetTickCount();
@@ -408,26 +440,45 @@ static void health_task(void *argument)
   (void)argument;
   health_monitor_init(&s_health, 0U);
 
+  /* MX_IWDG_Init()에서 scheduler 전에 시작된 counter를 HealthTask가 인수한다. */
+  health_iwdg_refresh();
+
   for (;;)
   {
     control_status_t status;
     app_io_metrics_t io;
     uint32_t now_ms;
+    bool refresh_allowed = false;
 
     vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(HEALTH_PERIOD_MS));
     now_ms = platform_now_ms();
 
     if (app_link_get_status(&status))
     {
-      bool refresh_allowed = health_monitor_update(&s_health, status.heartbeat,
-                                                   HEALTH_PERIOD_MS,
-                                                   HEALTH_HEARTBEAT_STALL_MS);
+      refresh_allowed = health_monitor_update(&s_health, status.heartbeat,
+                                              HEALTH_PERIOD_MS,
+                                              HEALTH_HEARTBEAT_STALL_MS);
 
-      /* 후속 단계에서 **HealthTask만** IWDG를 refresh한다. 이번 단계는 판정을
-         기록만 하고 peripheral을 켜지 않는다. */
       g_rtos_metrics.health_refresh_allowed = refresh_allowed ? 1U : 0U;
       g_rtos_metrics.health_stall_events = s_health.stall_events;
       g_rtos_metrics.health_max_stall_ms = s_health.max_stall_ms;
+    }
+    else
+    {
+      /* status mailbox가 없으면 ControlTask 진행 근거가 없으므로 먹이지 않는다. */
+      g_rtos_metrics.health_refresh_allowed = 0U;
+    }
+
+    if (refresh_allowed)
+    {
+      /* IWDG refresh의 유일한 정상 call site다. */
+      health_iwdg_refresh();
+    }
+    else
+    {
+      /* ControlTask 진행 근거가 사라진 fatal 경로다. reset을 기다리는 동안 마지막
+         PWM이 남지 않도록 즉시 MOE/CCR을 끊고 IWDG는 의도적으로 먹이지 않는다. */
+      platform_motor_kill();
     }
 
     app_get_io_metrics(&io);
@@ -485,6 +536,11 @@ void rtos_app_init(void)
   s_pending_fault_flags = 0U;
   g_control_tick_seq = 0U;
   g_control_tick_cycles = 0U;
+  g_iwdg_test_stall_control = 0U;
+  g_rtos_metrics.boot_reset_flags = platform_boot_reset_flags();
+  g_rtos_metrics.boot_was_iwdg_reset =
+      platform_boot_was_iwdg_reset() ? 1U : 0U;
+  g_rtos_metrics.iwdg_test_mode = (uint32_t)IWDG_STALL_TEST;
 
   /* 엔코더는 이미 platform_init()에서 돌고 있다. 현재 카운터를 기준으로 잡아
      첫 델타가 0이 되게 한다. */

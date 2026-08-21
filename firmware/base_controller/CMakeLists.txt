@@ -28,6 +28,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
+# 실제 보드 IWDG reset HIL 전용. ON build에서만 SWD로 ControlTask stall을 주입할
+# 수 있으며, 기본 firmware에는 fault-injection 분기가 컴파일되지 않는다.
+option(IWDG_STALL_TEST "Enable the SWD-triggered ControlTask stall hook" OFF)
+
 # Enable CMake support for ASM and C languages
 enable_language(C ASM)
 
@@ -111,6 +115,10 @@ endforeach()
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
 )
+
+if(IWDG_STALL_TEST)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE IWDG_STALL_TEST=1)
+endif()
 
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
