@@ -277,6 +277,19 @@ static void control_publish_status(uint32_t now_ms)
   g_rtos_metrics.stale_command_count = s_core.stale_command_count;
   g_rtos_metrics.fault_flags = status.fault_flags;
   g_rtos_metrics.wd_seq = status.wd_seq;
+
+  g_rtos_metrics.closed_loop = status.closed_loop ? 1U : 0U;
+  g_rtos_metrics.last_feed_ms = status.last_feed_ms;
+  g_rtos_metrics.target_tps_left = status.target_tps_left;
+  g_rtos_metrics.target_tps_right = status.target_tps_right;
+  g_rtos_metrics.measured_tps_left = status.measured_tps_left;
+  g_rtos_metrics.measured_tps_right = status.measured_tps_right;
+  g_rtos_metrics.duty_left_pm = status.duty_left_pm;
+  g_rtos_metrics.duty_right_pm = status.duty_right_pm;
+  g_rtos_metrics.integrator_left_mpm = status.integrator_left_mpm;
+  g_rtos_metrics.integrator_right_mpm = status.integrator_right_mpm;
+  g_rtos_metrics.saturated_left = status.saturated_left ? 1U : 0U;
+  g_rtos_metrics.saturated_right = status.saturated_right ? 1U : 0U;
 }
 
 static void control_task(void *argument)

@@ -54,6 +54,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/protocol_ascii.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rx_ring.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/control_core.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/speed_control.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/control_ack.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/health_policy.c
     # orchestration + STM32/RTOS adapter

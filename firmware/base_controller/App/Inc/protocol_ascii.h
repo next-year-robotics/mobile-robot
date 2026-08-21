@@ -6,6 +6,8 @@
   *
   *            호스트 -> MCU   duty <left_pm> <right_pm>\n   (-1000 ~ +1000)
   *                            stop\n
+  *                            vel  <left_tps> <right_tps>\n (-6000 ~ +6000)
+  *                            spd  <0|1>\n                  (폐루프 텔레메트리)
   *
   *          파싱에 실패한 줄은 명령으로 치지 않는다. 워치독을 갱신하지 않으므로
   *          호스트가 쓰레기를 보내는 동안에도 워치독이 계속 흐른다.
@@ -22,15 +24,19 @@
 typedef enum
 {
   PROTO_CMD_NONE = 0,
-  PROTO_CMD_DUTY,
-  PROTO_CMD_STOP
+  PROTO_CMD_DUTY,   /* 개루프 duty (‰) */
+  PROTO_CMD_STOP,
+  PROTO_CMD_VEL,    /* 폐루프 목표 속도 (tps) */
+  PROTO_CMD_SPD     /* 폐루프 텔레메트리 on/off. ControlTask로 가지 않는다. */
 } proto_cmd_kind_t;
 
 typedef struct
 {
   proto_cmd_kind_t kind;
-  int32_t          left_pm;   /* 클램프 전 원시값. 클램프는 motor_output이 한다. */
-  int32_t          right_pm;
+  /* 클램프 전 원시값. duty면 ‰, vel이면 tps, spd면 좌우 모두 0 또는 1이다.
+     클램프는 control_core가 한다. */
+  int32_t          left;
+  int32_t          right;
 } proto_command_t;
 
 typedef enum

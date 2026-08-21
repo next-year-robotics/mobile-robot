@@ -72,12 +72,54 @@
 #define MOTOR_SIGN_LEFT           (-1)
 #define MOTOR_SIGN_RIGHT          (+1)
 
+/* ---- 속도 폐루프 (M4) ---- */
+
+/* `vel` 지령의 클램프. limits.md 2절의 운용 상한 max_tps = 6000이며, PI 헤드룸
+   20 %와 피드포워드 선형 회귀 구간(<= 750 ‰)의 상한을 겸한다. */
+#define VEL_TARGET_MAX_TPS        6000
+
+/* 피드포워드 계수. M4-B duty-tps 재측정(2026-08-21, Vbat 13.2 V, 무부하)의
+   기울기 역수와 x절편이다. 좌우·정역 공통 회귀 구간은 <= 750 ‰이며,
+   방향별 R^2 >= 0.9997이다.
+
+     duty_ff = run_intercept * sign(target) + kff * target
+
+   **deadband_*(약 50 ‰)는 이 식에 들어가지 않는다.** 정지마찰과 운동마찰은 다른
+   물리량이고, 전자를 상시 피드포워드에 넣으면 약 30 ‰의 상수 바이어스가 전
+   운전점에 걸려 적분기가 늘 그것을 상쇄하게 된다 (limits.md 2절). */
+#define KFF_LEFT                  0.1187f   /* ‰/tps */
+#define KFF_RIGHT                 0.1194f   /* ‰/tps */
+#define RUN_INTERCEPT_LEFT        18.4f     /* ‰ */
+#define RUN_INTERCEPT_RIGHT       23.8f     /* ‰ */
+
+/* PI 게인. **추측값이 아니라 플랜트 시정수에서 산술로 나온 값이어야 한다.**
+   M4.md 7.2:  Ti = tau,  Kp = kff * tau / tau_cl,  Ki_cycle = Kp * T / Ti.
+
+   튜닝은 M4.md 7.3의 순서대로 한 번에 하나씩 바꾼다.
+     1단계 FF 단독 : Kp = 0, Ki_cycle = 0
+     2단계 P 추가  : Kp = kff / 2 (tau_cl = 2 tau), Ki_cycle = 0
+     3단계 I 추가  : Ki_cycle = Kp * 0.01 / tau  <- 지금 여기
+
+   M4-B 실측 tau는 좌 70 ms, 우 73 ms다. 초기 tau_cl은 각각 2 tau로 두며,
+   FF-only와 P-only 기준 측정을 마치고 아래 초기 PI 게인을 적용했다. */
+#define SPEED_KP_LEFT             0.05935f  /* ‰/tps — KFF_LEFT / 2 */
+#define SPEED_KP_RIGHT            0.05970f  /* ‰/tps — KFF_RIGHT / 2 */
+#define SPEED_KI_CYCLE_LEFT       0.008479f /* ‰/tps per cycle */
+#define SPEED_KI_CYCLE_RIGHT      0.008178f /* ‰/tps per cycle */
+
+/* 적분기 절댓값 상한. 운용 상한 6000 tps에서 FF가 731 ~ 740 ‰이므로 포화까지
+   남은 여유가 약 260 ‰다. 적분기가 그 여유를 넘게 두면 anti-windup과 별개로
+   클램프 자체가 의미를 잃는다. 반대로 적분기가 이 값을 지속적으로 쓰고 있다면
+   게인 문제가 아니라 모델이나 하드웨어 문제이므로 튜닝을 멈추고 원인을 본다. */
+#define SPEED_I_MAX_PM            250.0f    /* ‰ */
+
 /* ---- 명령 워치독 ---- */
 
 /* 마지막 유효 명령으로부터 이 시간이 지나면 duty 0. 호스트 툴이 죽거나 USB가
-   빠져도 모터가 계속 돌지 않게 한다. limits.md의 확정값 200 ms는 /cmd_vel 주기
-   기준이며 M4/M5에서 적용한다. M3는 사람이 개입하는 수동 시험이라 500 ms다. */
-#define CMD_WATCHDOG_MS           500U
+   빠져도 모터가 계속 돌지 않게 한다. limits.md 4절의 확정값이며 /cmd_vel 10 Hz
+   발행에서 2주기를 놓칠 여유다. M3의 500 ms는 사람이 개입하는 수동 시험 기준이었고
+   M4부터는 호스트 툴이 REFRESH_S = 0.05로 주기 갱신한다. */
+#define CMD_WATCHDOG_MS           200U
 
 /* ---- 통신 버퍼 ---- */
 #define CMD_RX_RING_SIZE          64U  /* 2의 거듭제곱이어야 한다 */
@@ -103,10 +145,22 @@
    int64(부호 포함 최대 20자). 값마다 앞에 공백 하나가 붙고 줄 끝에 '\n'이 온다. */
 #define LINE_MAX_TAG_LEN           5U
 #define LINE_U32_MAX_CHARS        10U
+#define LINE_I32_MAX_CHARS        11U
 #define LINE_I64_MAX_CHARS        20U
 #define TX_WORST_LINE_LEN         (LINE_MAX_TAG_LEN                     \
                                    + (1U + LINE_U32_MAX_CHARS)          \
                                    + (2U * (1U + LINE_I64_MAX_CHARS))   \
+                                   + 1U)
+
+/* `spd <ms> <tps_l> <duty_l> <tps_r> <duty_r>` — 값 4개다. 여기 실리는 값은 전부
+   int32 범위 안이다: 측정 tps는 접힌 엔코더 델타(<= +-32767) x 100 Hz, duty는
+   +-1000, 목표는 +-VEL_TARGET_MAX_TPS. 그래서 i64가 아니라 i32 폭으로 잡는다.
+   값 5개(목표 추가)로 늘리면 87 B가 되어 TX_LINE_CAP 확장과 UART_TX_TIMEOUT_MS
+   여유 재계산이 따라온다 — 목표는 ok가 이미 알려줬고 적분기와 포화 플래그는
+   SWD로 g_rtos_metrics에서 본다. */
+#define TX_WORST_SPD_LINE_LEN     (3U                                   \
+                                   + (1U + LINE_U32_MAX_CHARS)          \
+                                   + (4U * (1U + LINE_I32_MAX_CHARS))   \
                                    + 1U)
 
 /* ---- 불변식 ---- */
@@ -139,5 +193,33 @@ _Static_assert(CMD_APPLY_TIMEOUT_MS >= (3U * CONTROL_PERIOD_MS),
                "적용 대기 상한이 control cycle 몇 번보다 짧으면 정상 명령이 err가 된다");
 _Static_assert(CMD_WATCHDOG_MS > CONTROL_PERIOD_MS,
                "워치독이 control 주기보다 짧으면 명령이 반영되기 전에 만료된다");
+_Static_assert(TX_LINE_CAP >= TX_WORST_SPD_LINE_LEN,
+               "TX_LINE_CAP이 최악의 spd 줄보다 작다");
+_Static_assert(VEL_TARGET_MAX_TPS > 0 && VEL_TARGET_MAX_TPS <= 8000,
+               "vel 목표 상한이 M3 실측 물리 상한(7591 ~ 7853 tps) 밖이다");
+
+/* 게인 범위. 폐루프에서 부호가 틀리면 튜닝으로 나타나지 않고 첫 지령에서 폭주한다.
+   음의 게인은 그 자체로 양의 피드백이므로 컴파일에서 막는다. */
+_Static_assert(SPEED_KP_LEFT >= 0.0f && SPEED_KP_RIGHT >= 0.0f,
+               "Kp가 음수면 error가 커지는 방향으로 duty를 낸다 (양의 피드백)");
+_Static_assert(SPEED_KI_CYCLE_LEFT >= 0.0f && SPEED_KI_CYCLE_RIGHT >= 0.0f,
+               "Ki_cycle이 음수면 적분이 오차를 키운다 (양의 피드백)");
+_Static_assert(SPEED_I_MAX_PM > 0.0f && SPEED_I_MAX_PM < (float)MOTOR_DUTY_MAX_PM,
+               "적분기 상한이 duty 클램프 이상이면 클램프가 의미를 잃는다");
+_Static_assert(KFF_LEFT > 0.0f && KFF_RIGHT > 0.0f,
+               "kff는 duty-tps 회귀 기울기의 역수이므로 양수다");
+
+/* 8절 시험점이 데드밴드 위인지. 최저 시험점 1000 tps의 FF가 정지마찰
+   (좌 50.8 / 우 49.2 ‰)을 넘지 못하면 기동 킥 없이는 출발하지 못한다. */
+_Static_assert((RUN_INTERCEPT_LEFT + (KFF_LEFT * 1000.0f)) > (2.0f * 50.8f),
+               "좌 최저 시험점 1000 tps의 FF가 정지마찰의 2배에 못 미친다");
+_Static_assert((RUN_INTERCEPT_RIGHT + (KFF_RIGHT * 1000.0f)) > (2.0f * 49.2f),
+               "우 최저 시험점 1000 tps의 FF가 정지마찰의 2배에 못 미친다");
+
+/* 운용 상한에서 피드포워드가 회귀 선형 구간(<= 750 ‰) 안에 남는지. */
+_Static_assert((RUN_INTERCEPT_LEFT + (KFF_LEFT * (float)VEL_TARGET_MAX_TPS)) <= 750.0f,
+               "좌 운용 상한의 FF가 회귀 선형 구간을 벗어난다");
+_Static_assert((RUN_INTERCEPT_RIGHT + (KFF_RIGHT * (float)VEL_TARGET_MAX_TPS)) <= 750.0f,
+               "우 운용 상한의 FF가 회귀 선형 구간을 벗어난다");
 
 #endif /* APP_CONFIG_H */
