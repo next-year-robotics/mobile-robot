@@ -8,6 +8,7 @@
 
 #include "app_config.h"
 #include "app_main.h"
+#include "platform_uart1.h"
 
 #include "iwdg.h"
 #include "main.h"
@@ -258,6 +259,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   */
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
+  /* HAL callback은 주변장치마다 있지 않고 하나다. USART1(RPi5 직결)은 소유자가
+     다르므로 여기서 갈라 위임만 하고, 복구 정책은 platform_uart1이 가진다. */
+  if (huart->Instance == USART1)
+  {
+    platform_uart1_on_error_isr(huart->ErrorCode);
+    return;
+  }
+
   if (huart->Instance == USART2)
   {
     uint32_t error_code = huart->ErrorCode;

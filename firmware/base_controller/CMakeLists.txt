@@ -32,6 +32,10 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 # 수 있으며, 기본 firmware에는 fault-injection 분기가 컴파일되지 않는다.
 option(IWDG_STALL_TEST "Enable the SWD-triggered ControlTask stall hook" OFF)
 
+# U3 양방향 smoke test / 보드레이트 스윕 전용. ON build에서만 SmokeTask와 u3_smoke.c가
+# 들어가며, 기본 firmware는 USART1로 한 바이트도 내보내지 않는다.
+option(U3_SMOKE_TEST "Enable the USART1 U3 smoke-test task" OFF)
+
 # Enable CMake support for ASM and C languages
 enable_language(C ASM)
 
@@ -64,8 +68,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # orchestration + STM32/RTOS adapter
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/app_main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_stm32.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_uart1.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rtos_app.c
 )
+
+# U3 smoke test의 순수 모듈. 시험 build에서만 링크한다 — production image에 죽은
+# 코드를 남기지 않는다.
+if(U3_SMOKE_TEST)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/u3_smoke.c
+    )
+endif()
 
 # static-allocation 전용: FreeRTOS heap을 링크 대상에서 뺀다.
 #
@@ -98,9 +111,14 @@ set(APP_SOURCES
     App/Src/health_policy.c
     App/Src/app_main.c
     App/Src/platform_stm32.c
+    App/Src/platform_uart1.c
     Core/Src/main.c
     Core/Src/stm32f4xx_it.c
 )
+
+if(U3_SMOKE_TEST)
+    list(APPEND APP_SOURCES App/Src/u3_smoke.c)
+endif()
 
 # rtos_app.c만 -Wundef를 뺀다. FreeRTOS 헤더가 정의되지 않은 config 매크로를
 # #if로 검사하는 자리가 있어 application 코드의 문제가 아닌 경고가 뜬다.
@@ -118,6 +136,10 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 
 if(IWDG_STALL_TEST)
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE IWDG_STALL_TEST=1)
+endif()
+
+if(U3_SMOKE_TEST)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE U3_SMOKE_TEST=1)
 endif()
 
 # Remove wrong libob.a library dependency when using cpp files

@@ -6,9 +6,8 @@
             "hidden": true,
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-		    "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
-            "cacheVariables": {
-            }
+            "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
+            "cacheVariables": {}
         },
         {
             "name": "Debug",
@@ -30,6 +29,13 @@
             "cacheVariables": {
                 "IWDG_STALL_TEST": "ON"
             }
+        },
+        {
+            "name": "U3-Smoke",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "U3_SMOKE_TEST": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -44,6 +50,10 @@
         {
             "name": "IWDG-Stall",
             "configurePreset": "IWDG-Stall"
+        },
+        {
+            "name": "U3-Smoke",
+            "configurePreset": "U3-Smoke"
         }
     ]
 }

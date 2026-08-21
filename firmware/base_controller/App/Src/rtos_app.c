@@ -27,6 +27,12 @@
 #include "motor_safety.h"
 #include "platform_stm32.h"
 
+#if U3_SMOKE_TEST
+#include "line_builder.h"
+#include "platform_uart1.h"
+#include "u3_smoke.h"
+#endif
+
 /* ControlTask direct notification bit. TIM6/명령/fault가 같은 task를 깨운다. */
 #define CTRL_NOTIFY_TICK     (1UL << 0)
 #define CTRL_NOTIFY_COMMAND  (1UL << 1)
@@ -54,6 +60,14 @@ static StaticTask_t s_io_tcb;
 static TaskHandle_t s_control_task;
 static TaskHandle_t s_health_task;
 static TaskHandle_t s_io_task;
+
+#if U3_SMOKE_TEST
+/* SmokeTask는 U3 전용이다. handle을 여기 두는 이유는 HealthTask의 stack 계측이
+   task 본체보다 앞에 있기 때문이다. */
+static StackType_t  s_smoke_stack[TASK_STACK_WORDS_SMOKE];
+static StaticTask_t s_smoke_tcb;
+static TaskHandle_t s_smoke_task;
+#endif
 
 /* 길이 1 mailbox 3개. multi-field/int64 snapshot을 통째로 옮기는 유일한 수단이다. */
 static uint8_t       s_cmd_storage[sizeof(control_command_t)];
@@ -412,6 +426,10 @@ static void health_collect_stacks(void)
       (uint32_t)uxTaskGetStackHighWaterMark(xTaskGetIdleTaskHandle());
   g_rtos_metrics.stack_free_timer_words =
       (uint32_t)uxTaskGetStackHighWaterMark(xTimerGetTimerDaemonTaskHandle());
+#if U3_SMOKE_TEST
+  g_rtos_metrics.stack_free_smoke_words =
+      (uint32_t)uxTaskGetStackHighWaterMark(s_smoke_task);
+#endif
 }
 
 static void health_iwdg_refresh(void)
@@ -528,6 +546,224 @@ static void legacy_io_task(void *argument)
 }
 
 /* ------------------------------------------------------------------------- */
+/* SmokeTask (P1) — U3 전용, U3_SMOKE_TEST build에만 존재한다                  */
+/* ------------------------------------------------------------------------- */
+
+#if U3_SMOKE_TEST
+
+static u3_smoke_t s_smoke;
+static char       s_smoke_tx[U3_TX_LINE_CAP];
+static uint8_t    s_smoke_rx[U3_SMOKE_READ_CHUNK];
+
+static uint32_t s_smoke_seq;
+static uint32_t s_smoke_build_fail;
+
+/* T 스트림 주기. 7절에서 호스트가 `N`으로 바꿔 링크 부하율을 올린다 — 50 Hz 기본값은
+   micro-ROS 실부하를 흉내 낼 뿐이라 고속 구간에서는 듀티가 너무 낮아 판정이 안 된다. */
+static uint32_t s_stream_period_ms;
+
+/* 보드레이트 전환 안전망(7절). 새 속도에서 유효한 줄을 하나라도 받으면 해제된다. */
+static bool     s_baud_probation;
+static uint32_t s_baud_probation_ms;
+
+static void smoke_send(const char *tag, const int64_t *values, size_t count)
+{
+  size_t offset;
+  size_t length;
+
+  if (!line_build(s_smoke_tx, sizeof(s_smoke_tx), tag, values, count,
+                  &offset, &length))
+  {
+    /* 시험 경로다. 모터를 끊지 않는다 — 이 build에서도 제어 동작은 그대로여야 한다. */
+    s_smoke_build_fail++;
+    return;
+  }
+
+  (void)platform_uart1_write((const uint8_t *)&s_smoke_tx[offset], length);
+}
+
+/**
+  * @brief  50 Hz 상태 줄. **Pi -> MCU 방향의 판정값은 전부 여기 실린다.**
+  * @note   에코가 돌아오는 길에서 또 유실될 수 있으므로, 그 방향의 정직한 측정은
+  *         MCU 안의 계수기뿐이다. 호스트는 이 줄을 읽어 판정한다.
+  */
+static void smoke_send_status(uint32_t now_ms)
+{
+  platform_uart1_metrics_t link;
+  u3_counters_t counters;
+  int64_t values[U3_T_VALUE_COUNT];
+  int32_t duty_left = g_rtos_metrics.duty_left_pm;
+  int32_t duty_right = g_rtos_metrics.duty_right_pm;
+
+  platform_uart1_metrics(&link);
+  u3_smoke_counters(&s_smoke, &counters);
+
+  s_smoke_seq++;
+  values[0] = (int64_t)s_smoke_seq;
+  values[1] = (int64_t)now_ms;
+  values[2] = (int64_t)counters.rx_ping;
+  values[3] = (int64_t)counters.rx_bad;
+  values[4] = (int64_t)counters.rx_gap;
+  values[5] = (int64_t)counters.rx_dup;
+  values[6] = (int64_t)link.error_count;
+  values[7] = (int64_t)link.error_last;
+  values[8] = (int64_t)link.rx_overflow_count;
+  values[9] = (int64_t)link.rearm_count;
+  values[10] = (int64_t)g_rtos_metrics.loop_overruns;
+  /* 6절 "CCR은 안전하게 0으로 수렴" 판정값. 0이면 좌우 duty가 모두 0이다. */
+  values[11] = (int64_t)(((duty_left < 0) ? -duty_left : duty_left) +
+                         ((duty_right < 0) ? -duty_right : duty_right));
+
+  smoke_send("T", values, U3_T_VALUE_COUNT);
+}
+
+/**
+  * @brief  보드레이트를 바꾼다. ACK는 **전환 전 속도로** 나가야 호스트가 받는다.
+  */
+static void smoke_apply_baud(uint32_t baud)
+{
+  int64_t value = (int64_t)baud;
+
+  smoke_send("B", &value, 1U);
+
+  /* HAL_UART_Transmit은 TC까지 기다리므로 마지막 비트는 이미 선을 떠났다. 이 지연은
+     호스트가 ACK를 읽고 자기 포트를 다시 여는 시간이다. */
+  vTaskDelay(pdMS_TO_TICKS(U3_BAUD_ACK_SETTLE_MS));
+
+  if (!platform_uart1_set_baud(baud))
+  {
+    (void)platform_uart1_set_baud(U3_BAUD_DEFAULT);
+    s_baud_probation = false;
+    return;
+  }
+
+  s_baud_probation = (baud != U3_BAUD_DEFAULT);
+  s_baud_probation_ms = platform_now_ms();
+}
+
+static void smoke_task(void *argument)
+{
+  TickType_t last_wake = xTaskGetTickCount();
+  uint32_t last_stream_ms;
+
+  (void)argument;
+
+  u3_smoke_init(&s_smoke);
+  s_smoke_seq = 0U;
+  s_smoke_build_fail = 0U;
+  s_stream_period_ms = U3_STREAM_PERIOD_MS;
+  s_baud_probation = false;
+  s_baud_probation_ms = 0U;
+
+  /* 이 task가 USART1의 유일한 소유자다. handle이 다 생긴 지금 처음 무장한다. */
+  (void)platform_uart1_start();
+  last_stream_ms = platform_now_ms();
+
+  for (;;)
+  {
+    size_t received;
+    size_t i;
+    uint32_t now_ms;
+    uint32_t pending_baud = 0U;
+
+    vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(U3_SMOKE_POLL_MS));
+
+    /* 한 번의 FE/NE/PE/ORE로 링크가 영구히 죽지 않게 하는 그물이다. */
+    (void)platform_uart1_rearm_if_needed();
+
+    received = platform_uart1_read(s_smoke_rx, sizeof(s_smoke_rx));
+    for (i = 0U; i < received; i++)
+    {
+      uint32_t value = 0U;
+      u3_event_t event = u3_smoke_push(&s_smoke, (char)s_smoke_rx[i], &value);
+
+      if (event == U3_EVENT_NONE)
+      {
+        continue;
+      }
+
+      /* 형식이 맞는 줄이 하나라도 왔다면 이 속도에서 링크가 살아 있다는 뜻이다. */
+      if (event != U3_EVENT_BAD)
+      {
+        s_baud_probation = false;
+      }
+
+      if (event == U3_EVENT_RESET)
+      {
+        /* "여기서부터 세라". 링크 계수기도 같이 되돌려야 단계별 판정이 성립한다. */
+        platform_uart1_reset_metrics();
+      }
+      else if (event == U3_EVENT_BAUD)
+      {
+        /* 링에 남은 바이트를 마저 소비한 뒤에 바꾼다. */
+        pending_baud = value;
+      }
+      else if (event == U3_EVENT_PERIOD)
+      {
+        s_stream_period_ms = value;
+        last_stream_ms = platform_now_ms();
+      }
+      else if ((event == U3_EVENT_PING) &&
+               ((u3_smoke_mode(&s_smoke) & U3_MODE_ECHO) != 0U))
+      {
+        int64_t echo = (int64_t)value;
+
+        smoke_send("R", &echo, 1U);
+      }
+      else
+      {
+        /* MODE/BAD와 에코가 꺼진 PING은 계수기와 mode만 움직인다. */
+      }
+    }
+
+    if (pending_baud != 0U)
+    {
+      smoke_apply_baud(pending_baud);
+      last_wake = xTaskGetTickCount();
+      last_stream_ms = platform_now_ms();
+      continue;
+    }
+
+    now_ms = platform_now_ms();
+
+    if (s_baud_probation &&
+        ((uint32_t)(now_ms - s_baud_probation_ms) >= U3_BAUD_REVERT_MS))
+    {
+      s_baud_probation = false;
+      (void)platform_uart1_set_baud(U3_BAUD_DEFAULT);
+      last_wake = xTaskGetTickCount();
+      last_stream_ms = platform_now_ms();
+      continue;
+    }
+
+    if ((u3_smoke_mode(&s_smoke) & U3_MODE_STREAM) == 0U)
+    {
+      /* 꺼져 있는 동안 밀린 주기를 나중에 몰아 내보내지 않는다. */
+      last_stream_ms = now_ms;
+    }
+    else if ((uint32_t)(now_ms - last_stream_ms) >= s_stream_period_ms)
+    {
+      /* 따라가고 있는 동안은 누산으로 주기를 정확히 지킨다. 블로킹 송신이 주기보다
+         길어지는 저속·고부하 구간에서는 한 주기 넘게 밀리는데, 그때 밀린 몫을 몰아
+         내보내면 버스트가 된다. 그런 경우에는 현재 시각으로 맞춰 실제 달성 주파수가
+         스스로 낮아지게 두고, 호스트가 그 값을 그대로 잰다. */
+      last_stream_ms += s_stream_period_ms;
+      if ((uint32_t)(now_ms - last_stream_ms) >= s_stream_period_ms)
+      {
+        last_stream_ms = now_ms;
+      }
+      smoke_send_status(now_ms);
+    }
+    else
+    {
+      /* 아직 주기가 안 됐다. */
+    }
+  }
+}
+
+#endif /* U3_SMOKE_TEST */
+
+/* ------------------------------------------------------------------------- */
 /* 생성                                                                       */
 /* ------------------------------------------------------------------------- */
 
@@ -580,6 +816,16 @@ void rtos_app_init(void)
   {
     Error_Handler();
   }
+
+#if U3_SMOKE_TEST
+  s_smoke_task = xTaskCreateStatic(smoke_task, "Smoke",
+                                   TASK_STACK_WORDS_SMOKE, NULL,
+                                   TASK_PRIO_SMOKE, s_smoke_stack, &s_smoke_tcb);
+  if (s_smoke_task == NULL)
+  {
+    Error_Handler();
+  }
+#endif
 }
 
 /* ------------------------------------------------------------------------- */
