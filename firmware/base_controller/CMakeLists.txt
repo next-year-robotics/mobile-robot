@@ -45,12 +45,44 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    # -- 애플리케이션 (CubeMX 재생성 영역 밖) --
+    # HAL/RTOS 비의존 순수 모듈
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/line_builder.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/encoder_accumulator.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/motor_output.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/motor_safety.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/protocol_ascii.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rx_ring.c
+    # orchestration + STM32 adapter
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/app_main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_stm32.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Inc
 )
+
+# 애플리케이션 소스에만 강한 경고를 건다. HAL 드라이버는 이 옵션 아래에서 깨끗하지
+# 않으므로 전역으로 걸지 않는다(툴체인 파일이 이미 -Wall을 전역으로 준다).
+set(APP_WARNING_FLAGS -Wall -Wextra -Wshadow -Wformat=2 -Wundef)
+set(APP_SOURCES
+    App/Src/line_builder.c
+    App/Src/encoder_accumulator.c
+    App/Src/motor_output.c
+    App/Src/motor_safety.c
+    App/Src/protocol_ascii.c
+    App/Src/rx_ring.c
+    App/Src/app_main.c
+    App/Src/platform_stm32.c
+    Core/Src/main.c
+    Core/Src/stm32f4xx_it.c
+)
+foreach(app_source IN LISTS APP_SOURCES)
+    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/${app_source}
+                 APPEND PROPERTY COMPILE_OPTIONS ${APP_WARNING_FLAGS})
+endforeach()
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
