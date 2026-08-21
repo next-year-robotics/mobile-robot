@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "iwdg.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -84,6 +85,10 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  /* reset 원인은 RCC flag를 지우기 전에 보존한다. debugger halt 중에는 IWDG를
+     멈춰 SWD 계측이 reset을 유발하지 않게 한다. 둘 다 IWDG 시작보다 앞선다. */
+  platform_boot_snapshot_reset_flags();
+  __HAL_DBGMCU_FREEZE_IWDG();
 
   /* USER CODE END Init */
 
@@ -101,6 +106,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM1_Init();
   MX_TIM6_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   /* TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, DWT 활성화까지 여기서 끝난다.
      인터럽트 원(USART2 RX, TIM6)은 여기서 켜지 않는다 — task handle과 static
@@ -153,8 +159,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 8;

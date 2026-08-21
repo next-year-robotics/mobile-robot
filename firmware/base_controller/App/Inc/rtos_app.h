@@ -54,7 +54,16 @@ typedef struct
 
   uint32_t health_stall_events;
   uint32_t health_max_stall_ms;
-  uint32_t health_refresh_allowed;    /* 향후 IWDG refresh 판정. 지금은 기록만 한다. */
+  uint32_t health_refresh_allowed;    /* 이번 HealthTask 주기의 refresh 판정 */
+
+  /* IWDG/reset 계측. reset_flags는 boot 직후 RCC_CSR의 reset-cause bit mask다. */
+  uint32_t boot_reset_flags;
+  uint32_t boot_was_iwdg_reset;
+  uint32_t iwdg_first_refresh_ms;     /* boot HAL tick 기준 startup handoff 시각 */
+  uint32_t iwdg_refresh_count;
+  uint32_t iwdg_refresh_fail_count;
+  uint32_t iwdg_test_mode;
+  uint32_t iwdg_test_stall_seen;
 
   /* ---- 속도 폐루프 계측 (M4) ----
      "계측은 와이어가 아니라 SWD로"가 뼈대 단계에서 세운 원칙이다. 목표/적분기/
@@ -80,6 +89,12 @@ extern volatile uint32_t g_control_tick_seq;
 
 /** @brief TIM6 ISR이 잡은 DWT cycle timestamp. wake latency의 기준이다. */
 extern volatile uint32_t g_control_tick_cycles;
+
+/**
+  * @brief IWDG_STALL_TEST build에서 SWD로 1을 쓰면 ControlTask를 안전 정지시킨다.
+  * @note  production build에도 관측 symbol은 남지만 test option이 0이면 무시한다.
+  */
+extern volatile uint32_t g_iwdg_test_stall_control;
 
 /**
   * @brief  static task와 mailbox를 만든다. MX_FREERTOS_Init()에서 부른다.

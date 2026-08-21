@@ -16,6 +16,24 @@
 #include "motor_output.h"
 
 /**
+  * @brief  RCC reset-cause bits를 boot 초기에 보존하고 hardware flags를 clear한다.
+  * @note   HAL_Init() 직후, SystemClock_Config()/IWDG 시작 전에 한 번 호출한다.
+  */
+void platform_boot_snapshot_reset_flags(void);
+
+/** @brief boot 때 보존한 RCC_CSR reset-cause bit mask. */
+uint32_t platform_boot_reset_flags(void);
+
+/** @brief 직전 reset 원인에 IWDG가 포함되어 있었는가. */
+bool platform_boot_was_iwdg_reset(void);
+
+/**
+  * @brief IWDG counter를 refresh한다. HealthTask만 호출한다.
+  * @retval HAL refresh 성공 여부.
+  */
+bool platform_iwdg_refresh(void);
+
+/**
   * @brief  TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, DWT cycle counter 활성화.
   * @note   **인터럽트 원을 하나도 켜지 않는다.** scheduler가 서기 전에 task handle이
   *         없는 ISR이 뜨는 것을 막기 위해 UART 수신 무장과 TIM6 기동은 각 소유

@@ -49,11 +49,10 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* CubeMX가 만들던 static defaultTask는 제거했다. application task는 전부
-   App/Src/rtos_app.c가 native xTaskCreateStatic으로 만든다.
-   -- 재생성 주의: CubeMX에서 Generate Code를 다시 하면 여기에 defaultTask 정의와
-      MX_FREERTOS_Init()의 osThreadNew() 호출이 되살아난다. 먼저 .ioc의
-      FreeRTOS > Tasks에서 defaultTask를 지워야 한다. */
+/* CubeMX는 FreeRTOS task를 최소 하나 요구하므로 .ioc에는 placeholder
+   defaultTask가 남아 있다. application task는 전부 App/Src/rtos_app.c가 native
+   xTaskCreateStatic으로 만들며, 생성 직후 아래 placeholder 정의/생성/함수를 다시
+   제거한다. */
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -139,4 +138,3 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-
