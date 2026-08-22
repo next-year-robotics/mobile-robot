@@ -8,6 +8,7 @@
   *          task/IRQ/데이터 소유권
   *            - ControlTask  P5 : TIM6 tick, 엔코더 샘플, 워치독, **TIM1 출력**
   *            - HealthTask   P4 : heartbeat/stack/fault 관측, LED
+  *            - MicroRosTask P3 : **USART1**, micro-ROS 세션/pub/sub/재접속 (M5)
   *            - LegacyIoTask P2 : USART2 RX/TX, ASCII 파싱, ACK, 50 Hz telemetry
   ******************************************************************************
   */
@@ -32,6 +33,7 @@ typedef struct
   uint32_t stale_command_count;
   uint32_t fault_flags;
   uint32_t wd_seq;
+  uint32_t wd_ms;                     /* 마지막 워치독 만료 edge 시각 */
 
   /* LegacyIoTask/ISR 계측 (app_main.c에서 복사해 온다) */
   uint32_t rx_overflow_count;
@@ -52,6 +54,7 @@ typedef struct
   uint32_t stack_free_idle_words;
   uint32_t stack_free_timer_words;
   uint32_t stack_free_smoke_words;    /* U3_SMOKE_TEST build에서만 갱신된다 */
+  uint32_t stack_free_micro_ros_words;/* MICRO_ROS build에서만 갱신된다 */
 
   uint32_t health_stall_events;
   uint32_t health_max_stall_ms;
@@ -81,6 +84,47 @@ typedef struct
   int32_t  integrator_right_mpm;
   uint32_t saturated_left;            /* 클램프 전 duty가 범위를 벗어났는가 */
   uint32_t saturated_right;
+
+  /* ---- micro-ROS 계측 (M5) ----
+     micro_ros_app.c가 만든 snapshot을 HealthTask가 옮겨 온다. MICRO_ROS build가
+     아니면 전부 0으로 남는다 — 필드 자체는 남겨 SWD 스크립트를 갈라 쓰지 않는다. */
+  uint32_t mr_agent_state;            /* agent_state_t. 2 = CONNECTED */
+  uint32_t mr_connect_count;
+  uint32_t mr_disconnect_count;
+  uint32_t mr_ping_fail_count;
+  uint32_t mr_create_fail_count;
+  uint32_t mr_spin_fail_count;
+  uint32_t mr_time_sync_count;
+  uint32_t mr_time_sync_fail_count;
+  uint32_t mr_epoch_synchronized;
+  uint32_t mr_cmd_vel_count;
+  uint32_t mr_cmd_vel_applied_count;
+  uint32_t mr_cmd_vel_rejected_count;
+  uint32_t mr_cmd_vel_last_verdict;   /* cmd_stamp_verdict_t */
+  uint32_t mr_cmd_vel_age_ms;
+  uint32_t mr_joint_states_count;
+  uint32_t mr_joint_states_fail_count;
+  uint32_t mr_joint_states_stale_count;
+  uint32_t mr_base_status_count;
+  uint32_t mr_base_status_fail_count;
+
+  /* micro-ROS 전용 pool. `free_min`이 안정화되고 `alloc_fail`이 0이면
+     M5.md 10절의 heap 항목이 통과다. */
+  uint32_t mr_pool_capacity;
+  uint32_t mr_pool_free;
+  uint32_t mr_pool_free_min;
+  uint32_t mr_pool_largest_free;
+  uint32_t mr_pool_alloc_fail;
+  uint32_t mr_pool_invalid_free;
+  uint32_t mr_pool_live_blocks;
+  uint32_t mr_pool_escaped_alloc;    /* libc malloc 우회 횟수. 0이어야 한다 */
+
+  /* USART1 링크. M5.md 6.6절의 "모터 구동 중 링크" 미검증 항목을 여기서 닫는다. */
+  uint32_t mr_uart1_error_count;
+  uint32_t mr_uart1_error_last;
+  uint32_t mr_uart1_rx_overflow_count;
+  uint32_t mr_uart1_rearm_count;
+  uint32_t mr_uart1_tx_fail_count;
 } rtos_metrics_t;
 
 extern rtos_metrics_t g_rtos_metrics;

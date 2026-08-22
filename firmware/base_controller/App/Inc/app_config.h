@@ -87,6 +87,95 @@
 /* HealthTask가 control heartbeat 정체로 보고 IWDG refresh를 중단하는 한계. */
 #define HEALTH_HEARTBEAT_STALL_MS 100U
 
+/* ---- micro-ROS (M5) ---- */
+
+/* CMake의 -DMICRO_ROS=ON일 때만 MicroRosTask와 libmicroros.a가 들어간다.
+   U3_SMOKE_TEST와는 **동시에 켤 수 없다** — 둘 다 USART1의 소유자를 자처한다. */
+#ifndef MICRO_ROS
+#define MICRO_ROS                    0
+#endif
+
+/* ControlTask보다 낮고 LegacyIoTask보다 높다.
+     - ControlTask(P5)보다 낮아야 하는 이유: micro-ROS는 blocking 송신과 상한이
+       분명치 않은 executor를 품고 있다. 100 Hz 제어를 막을 수 없어야 한다.
+     - HealthTask(P4)보다 낮아야 하는 이유: reconnect storm 중에도 IWDG는 계속
+       먹어야 한다 (M5.md 10절 "reconnect storm 중 IWDG 오동작 reset 0").
+     - LegacyIoTask(P2)보다 **높아야** 하는 이유: 이제 실제 주행 명령이 이 경로로
+       온다. 디버그용 ASCII 텔레메트리가 /cmd_vel을 밀어내면 안 된다. */
+#define TASK_PRIO_MICRO_ROS         3U
+
+/* rcl/rclc의 호출 깊이가 있어 LegacyIoTask보다 넉넉히 잡는다. 실제 사용량은
+   HealthTask가 재는 stack high-water mark로 확인하고 줄인다. */
+#define TASK_STACK_WORDS_MICRO_ROS 1536U  /* 6,144 B */
+
+/* MicroRosTask 한 바퀴의 상한. 이 주기가 곧 `/joint_states` 타이밍 분해능이다. */
+#define MICRO_ROS_POLL_MS            2U
+
+/* base_contract.md 토픽 요약 표의 발행 주기. */
+#define JOINT_STATES_PERIOD_MS      20U  /* 50 Hz */
+#define BASE_STATUS_PERIOD_MS      100U  /* 10 Hz */
+
+/* `/joint_states` stamp를 되돌릴 수 있는 최대 나이. 정상값은 한 control cycle
+   (10 ms) 이내다. 여기에 닿았다면 ControlTask가 멈춘 것이므로 더 과거로 보내는
+   대신 상한에서 자르고 계수한다. */
+#define JOINT_STATES_MAX_AGE_MS    100
+
+/* micro-ROS 전용 pool. FreeRTOS heap도 newlib malloc도 쓰지 않는 이유는
+   static_pool.h에 있다.
+
+   **실측으로 정한 값이다** (2026-08-22, M5.md 11절). 노드 1 + pub 2 + sub 1 +
+   executor 1 구성에서 최대 사용량이 **1,368 B**였고, 재접속 9회와 13분 세션 동안
+   `free_min`이 한 번도 그 아래로 내려가지 않았다(누수 0). 8 KiB는 약 6배 여유다.
+
+   여유를 6배나 두는 이유: 이 값을 딱 맞게 깎으면 토픽을 하나 늘리는 순간
+   `alloc_fail`이 뜨는데, 그 실패는 "엔티티 생성 실패 → 재접속 반복"으로 나타나
+   원인을 트랜스포트에서 찾게 된다. RAM은 128 KiB 중 절반이 남아 있다.
+   토픽을 늘렸다면 `mr_pool_free_min`을 다시 읽어 이 주석의 숫자를 갱신한다. */
+#define MICRO_ROS_POOL_BYTES      8192U  /* 8 KiB — 실측 최대 1,368 B의 약 6배 */
+
+/* custom transport read의 폴링 주기. platform_uart1의 DMA 링을 긁는 간격이며
+   U3_SMOKE_POLL_MS와 같은 근거다(링 2048 B는 921600에서 22 ms 분량). */
+#define MICRO_ROS_TRANSPORT_POLL_MS  1U
+
+/* agent 연결 상태기계 (agent_link.c). */
+#define AGENT_BACKOFF_MIN_MS       500U  /* 첫 재시도 간격 */
+#define AGENT_BACKOFF_MAX_MS      4000U  /* 지수 증가의 상한 */
+#define AGENT_ALIVE_PING_MS        500U  /* CONNECTED 중 생존 확인 주기 */
+#define AGENT_PING_RETRY_MS        100U  /* 한 번 놓쳤을 때의 재확인 간격 */
+#define AGENT_PING_FAIL_LIMIT        2U  /* 이만큼 연속 실패하면 끊긴 것으로 본다 */
+
+/* rmw_uros_ping_agent에 주는 인자. ping 하나가 이보다 오래 executor를 막지 않는다. */
+#define AGENT_PING_TIMEOUT_MS       30U
+#define AGENT_PING_ATTEMPTS          1U
+
+/* rmw_uros_sync_session 타임아웃. 동기 전에는 어떤 /cmd_vel도 실행하지 않으므로
+   (base_contract.md 1절) 연결 직후 반드시 한 번 성공해야 로봇이 움직인다. */
+#define AGENT_TIME_SYNC_TIMEOUT_MS 200U
+#define AGENT_TIME_SYNC_RETRY_MS  1000U
+
+/* **동기는 한 번으로 끝나지 않는다.** `rmw_uros_epoch_nanos()`는 동기 시점에 잰
+   offset에 MCU 자기 시계를 더한 값이다. MCU tick과 Pi 시계는 결이 다르므로 그 offset이
+   시간에 비례해 낡는다 — 2026-08-22 실측 **약 22 ppm**(90초에 +2 ms). 그대로 두면
+   `ros2 topic delay`가 연결 직후 3 ms에서 시작해 40분 뒤 30 ms가 되어 10절의 20 ms
+   기준을 조용히 넘긴다. 링크는 멀쩡한데 stamp만 늙는 것이라 더 나쁘다.
+
+   30초 주기면 22 ppm에서 누적 오차가 0.7 ms를 넘지 않는다. 재동기 한 번은 XRCE
+   왕복 하나(921600에서 수 ms)라 50 Hz 발행 슬롯을 잡아먹지 않는다. 타임아웃을 최초
+   동기보다 짧게 두는 것은, 이미 세션이 서 있는 상태에서 오래 기다려 봐야 얻을 것이
+   없고 그 시간만큼 발행이 밀리기 때문이다. */
+#define AGENT_TIME_SYNC_PERIOD_MS 30000U
+#define AGENT_TIME_SYNC_RESYNC_TIMEOUT_MS 50U
+
+/* `/cmd_vel`의 나이 상한. limits.md 4절의 명령 워치독과 같은 값이어야 한다 —
+   생성 시각 기준 판정과 MCU 내부 워치독이 서로 다른 기한을 쓰면 둘 중 느슨한
+   쪽이 실제 기한이 되어 문서가 거짓말이 된다. */
+#define CMD_VEL_MAX_AGE_MS  CMD_WATCHDOG_MS
+
+/* `/cmd_vel`의 header.frame_id를 받을 자리. 계약상 MCU는 이 값을 무시하지만,
+   정적 할당에서는 역직렬화가 쓸 공간을 미리 줘야 한다. 넘치면 그 메시지 하나가
+   버려질 뿐 링크는 살아 있다. */
+#define CMD_VEL_FRAME_ID_CAP        32U
+
 /* ---- 엔코더 ---- */
 
 /* 로봇 전진 시 좌우 누적 틱이 모두 +가 되게 하는 보정. 2026-08-20 M2 실측:
@@ -230,6 +319,24 @@ _Static_assert(TASK_PRIO_LEGACY_IO > TASK_PRIO_SMOKE,
                "SmokeTask가 LegacyIoTask보다 높으면 시험 트래픽이 명령/텔레메트리를 밀어낸다");
 _Static_assert(TASK_PRIO_SMOKE > 0U,
                "SmokeTask가 idle 우선순위면 T 스트림이 굶는다");
+_Static_assert(!(MICRO_ROS && U3_SMOKE_TEST),
+               "micro-ROS와 U3 smoke는 둘 다 USART1 소유자다. 동시에 켤 수 없다");
+_Static_assert(TASK_PRIO_HEALTH > TASK_PRIO_MICRO_ROS,
+               "MicroRosTask가 HealthTask보다 높으면 reconnect storm이 IWDG를 굶긴다");
+_Static_assert(TASK_PRIO_CONTROL > TASK_PRIO_MICRO_ROS,
+               "MicroRosTask가 ControlTask보다 높으면 통신이 100 Hz 제어를 막는다");
+_Static_assert(TASK_PRIO_MICRO_ROS > TASK_PRIO_LEGACY_IO,
+               "레거시 ASCII 텔레메트리가 /cmd_vel을 밀어내면 안 된다");
+_Static_assert(JOINT_STATES_PERIOD_MS >= MICRO_ROS_POLL_MS,
+               "발행 주기가 task 주기보다 짧으면 한 바퀴에 두 번 발행이 밀린다");
+_Static_assert(BASE_STATUS_PERIOD_MS >= JOINT_STATES_PERIOD_MS,
+               "/base/status(10 Hz)가 /joint_states(50 Hz)보다 잦으면 계약 위반이다");
+_Static_assert(CMD_VEL_MAX_AGE_MS == CMD_WATCHDOG_MS,
+               "stamp 기준 기한과 MCU 내부 워치독이 갈리면 느슨한 쪽이 실제 기한이 된다");
+_Static_assert(AGENT_BACKOFF_MAX_MS >= AGENT_BACKOFF_MIN_MS,
+               "backoff 상한이 하한보다 작으면 지수 증가가 즉시 잘린다");
+_Static_assert(AGENT_PING_FAIL_LIMIT >= 1U,
+               "ping 실패 허용치가 0이면 상태기계가 진행하지 못한다");
 _Static_assert(U3_STREAM_PERIOD_MS >= U3_SMOKE_POLL_MS,
                "T 스트림 주기가 poll 주기보다 짧으면 한 주기에 두 줄이 밀린다");
 _Static_assert(CMD_APPLY_TIMEOUT_MS >= (3U * CONTROL_PERIOD_MS),

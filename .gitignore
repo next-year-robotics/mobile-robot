@@ -1,5 +1,6 @@
 /0_tmp
-/tools
+__pycache__/
+*.py[cod]
 firmware/base_controller/build/
 build/
 *.obj
@@ -7,4 +8,8 @@ build/
 *.bin
 *.hex
 *.map
+firmware/base_controller/micro_ros/libmicroros/
+firmware/base_controller/micro_ros/library_generation/extra_packages/
+/tools
+/firmware/base_controller/micro_ros/README.md
 firmware/base_controller/test

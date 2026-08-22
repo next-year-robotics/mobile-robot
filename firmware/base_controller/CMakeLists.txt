@@ -36,6 +36,20 @@ option(IWDG_STALL_TEST "Enable the SWD-triggered ControlTask stall hook" OFF)
 # 들어가며, 기본 firmware는 USART1로 한 바이트도 내보내지 않는다.
 option(U3_SMOKE_TEST "Enable the USART1 U3 smoke-test task" OFF)
 
+# micro-ROS (M5 8절). production image의 기본값이 ON인 이유는 M5부터 이것이
+# 로봇의 주 통신 경로이기 때문이다. U3-Smoke preset만 OFF로 덮는다 — 둘 다
+# USART1의 소유자를 자처하므로 app_config.h의 _Static_assert가 동시 사용을 막는다.
+option(MICRO_ROS "Link libmicroros.a and run MicroRosTask" ON)
+
+set(MICRO_ROS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros/libmicroros)
+if(MICRO_ROS AND NOT EXISTS ${MICRO_ROS_DIR}/libmicroros.a)
+    # 산출물은 git에 없다(레시피만 있다). 조용히 링크 실패로 끌고 가지 않는다.
+    message(FATAL_ERROR
+        "libmicroros.a가 없다: ${MICRO_ROS_DIR}/libmicroros.a\n"
+        "  ./micro_ros/build_libmicroros.sh 를 먼저 돌려라.\n"
+        "  micro-ROS 없이 빌드하려면 -DMICRO_ROS=OFF.")
+endif()
+
 # Enable CMake support for ASM and C languages
 enable_language(C ASM)
 
@@ -71,6 +85,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_uart1.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rtos_app.c
 )
+
+# micro-ROS 경로. 순수 모듈 셋(static_pool / base_kinematics / agent_link)은 host
+# 단위 테스트가 있고, micro_ros_app.c만 rcl/rclc를 부른다.
+if(MICRO_ROS)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/static_pool.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/base_kinematics.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/agent_link.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/micro_ros_app.c
+    )
+endif()
 
 # U3 smoke test의 순수 모듈. 시험 build에서만 링크한다 — production image에 죽은
 # 코드를 남기지 않는다.
@@ -120,6 +145,19 @@ if(U3_SMOKE_TEST)
     list(APPEND APP_SOURCES App/Src/u3_smoke.c)
 endif()
 
+# micro_ros_app.c는 이 목록에 넣지 않는다. libmicroros의 생성 헤더가 -Wundef와
+# -Wformat=2 아래에서 깨끗하지 않고, 그건 우리가 고칠 코드가 아니다. 대신 아래에서
+# 우리 코드에 대한 경고만 따로 건다.
+if(MICRO_ROS)
+    list(APPEND APP_SOURCES
+        App/Src/static_pool.c
+        App/Src/base_kinematics.c
+        App/Src/agent_link.c
+    )
+    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/micro_ros_app.c
+                 APPEND PROPERTY COMPILE_OPTIONS -Wall -Wextra -Wshadow)
+endif()
+
 # rtos_app.c만 -Wundef를 뺀다. FreeRTOS 헤더가 정의되지 않은 config 매크로를
 # #if로 검사하는 자리가 있어 application 코드의 문제가 아닌 경고가 뜬다.
 set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rtos_app.c
@@ -142,6 +180,14 @@ if(U3_SMOKE_TEST)
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE U3_SMOKE_TEST=1)
 endif()
 
+if(MICRO_ROS)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MICRO_ROS=1)
+    # SYSTEM으로 넣어 생성 헤더의 경고가 우리 빌드 로그를 덮지 않게 한다.
+    target_include_directories(${CMAKE_PROJECT_NAME} SYSTEM PRIVATE
+        ${MICRO_ROS_DIR}/include
+    )
+endif()
+
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
@@ -151,3 +197,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
 )
+
+if(MICRO_ROS)
+    # 절대 경로로 건다. -L/-l 조합은 검색 경로에 있는 다른 libmicroros를 집어 갈 수
+    # 있고, ABI가 다른 라이브러리를 링크하면 실패가 런타임까지 내려간다.
+    target_link_libraries(${CMAKE_PROJECT_NAME} ${MICRO_ROS_DIR}/libmicroros.a)
+endif()

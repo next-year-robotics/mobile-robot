@@ -34,7 +34,15 @@
             "name": "U3-Smoke",
             "inherits": "Debug",
             "cacheVariables": {
-                "U3_SMOKE_TEST": "ON"
+                "U3_SMOKE_TEST": "ON",
+                "MICRO_ROS": "OFF"
+            }
+        },
+        {
+            "name": "Debug-NoMicroROS",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "MICRO_ROS": "OFF"
             }
         }
     ],
@@ -54,6 +62,10 @@
         {
             "name": "U3-Smoke",
             "configurePreset": "U3-Smoke"
+        },
+        {
+            "name": "Debug-NoMicroROS",
+            "configurePreset": "Debug-NoMicroROS"
         }
     ]
 }
