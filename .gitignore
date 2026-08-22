@@ -11,5 +11,6 @@ build/
 firmware/base_controller/micro_ros/libmicroros/
 firmware/base_controller/micro_ros/library_generation/extra_packages/
 /tools
-/firmware/base_controller/micro_ros/README.md
+firmware/base_controller/micro_ros/README.md
 firmware/base_controller/test
+software/ros_pkgs/mr_base/test
