@@ -1,0 +1,18 @@
+# M6 오도메트리 노드 파라미터. 값의 원본은 interface/base_contract.md "물리 상수"다.
+# 남은 파라미터가 순수 기하학뿐인 것이 "오도메트리는 호스트, 제어는 MCU" 분리의 증거다.
+# ticks_per_rev, 좌우 tick sign, 제어 주기, 게인, 시리얼 포트는 여기 없다 — 전부 MCU다.
+mr_base:
+  ros__parameters:
+    wheel_radius_m: 0.050          # 100 mm 바퀴 공칭. 하중에 눌리므로 M6 직선 2 m로 보정
+    wheel_separation_m: 0.264      # 줄자 실측 2026-08-22 (트레드 중심 간). M6 360°x4로 보정
+    odom_frame_id: odom
+    base_frame_id: base_footprint
+    left_wheel_joint: left_wheel_joint
+    right_wheel_joint: right_wheel_joint
+    publish_tf: true
+
+    # wheel-only 오도메트리가 관측하지 못하는 자유도(z, roll, pitch)와 횡슬립을
+    # 0 공분산으로 숨기지 않는다. 관측하는 x/y/yaw도 완전하지 않으므로 유한한 값을 준다.
+    # 시작값이고, U4 IMU + robot_localization EKF를 붙일 때 다시 맞춘다.
+    pose_covariance_diagonal:  [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 0.01]
+    twist_covariance_diagonal: [0.001, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 0.01]
