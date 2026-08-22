@@ -33,10 +33,16 @@
 #include "u3_smoke.h"
 #endif
 
+#if MICRO_ROS
+#include "micro_ros_app.h"
+#endif
+
 /* ControlTask direct notification bit. TIM6/명령/fault가 같은 task를 깨운다. */
 #define CTRL_NOTIFY_TICK     (1UL << 0)
 #define CTRL_NOTIFY_COMMAND  (1UL << 1)
 #define CTRL_NOTIFY_FAULT    (1UL << 2)
+/* micro-ROS `/cmd_vel`. 레거시 명령과 bit를 나눠 어느 mailbox를 비울지 구분한다. */
+#define CTRL_NOTIFY_CMDVEL   (1UL << 3)
 
 #define IO_NOTIFY_RX         (1UL << 0)
 
@@ -69,6 +75,14 @@ static StaticTask_t s_smoke_tcb;
 static TaskHandle_t s_smoke_task;
 #endif
 
+#if MICRO_ROS
+/* MicroRosTask (P3). 본체는 micro_ros_app.c에 있고 여기서는 정적 메모리와
+   생성만 소유한다 — RTOS 객체를 만드는 자리를 이 파일 하나로 유지한다. */
+static StackType_t  s_micro_ros_stack[TASK_STACK_WORDS_MICRO_ROS];
+static StaticTask_t s_micro_ros_tcb;
+static TaskHandle_t s_micro_ros_task;
+#endif
+
 /* 길이 1 mailbox 3개. multi-field/int64 snapshot을 통째로 옮기는 유일한 수단이다. */
 static uint8_t       s_cmd_storage[sizeof(control_command_t)];
 static StaticQueue_t s_cmd_queue_cb;
@@ -81,6 +95,12 @@ static QueueHandle_t s_result_queue;
 static uint8_t       s_status_storage[sizeof(control_status_t)];
 static StaticQueue_t s_status_queue_cb;
 static QueueHandle_t s_status_queue;
+
+/* micro-ROS `/cmd_vel` 전용 길이 1 mailbox. 레거시 명령 큐와 나눈 근거는
+   app_link.h의 app_link_post_cmd_vel() 주석에 있다. 이쪽에는 결과 큐가 없다. */
+static uint8_t       s_cmdvel_storage[sizeof(control_command_t)];
+static StaticQueue_t s_cmdvel_queue_cb;
+static QueueHandle_t s_cmdvel_queue;
 
 /* idle/timer task 메모리. 생성 wrapper의 weak 기본 구현에 기대지 않는다. */
 static StackType_t  s_idle_stack[TASK_STACK_WORDS_IDLE];
@@ -173,6 +193,25 @@ bool app_link_post_command(const control_command_t *cmd)
   }
 
   (void)xTaskNotify(s_control_task, CTRL_NOTIFY_COMMAND, eSetBits);
+  return true;
+}
+
+bool app_link_post_cmd_vel(const control_command_t *cmd)
+{
+  if ((s_cmdvel_queue == NULL) || (s_control_task == NULL))
+  {
+    return false;
+  }
+
+  /* overwrite다. 아직 소비되지 않은 이전 /cmd_vel은 사라진다 — KEEP_LAST(1)
+     BEST_EFFORT 계약과 같은 뜻이며, 큐에 쌓인 속도 지령은 이미 사용자의 의도가
+     아니다 (base_contract.md QoS 절). */
+  if (xQueueOverwrite(s_cmdvel_queue, cmd) != pdPASS)
+  {
+    return false;
+  }
+
+  (void)xTaskNotify(s_control_task, CTRL_NOTIFY_CMDVEL, eSetBits);
   return true;
 }
 
@@ -292,6 +331,9 @@ static void control_publish_status(uint32_t now_ms)
   g_rtos_metrics.stale_command_count = s_core.stale_command_count;
   g_rtos_metrics.fault_flags = status.fault_flags;
   g_rtos_metrics.wd_seq = status.wd_seq;
+  /* wd_ms - last_feed_ms가 MCU 내부에서 잰 실제 워치독 지연이다. 호스트에서
+     본 정지 시각에는 관성 감속과 표본 간격이 섞이므로 그쪽으로 판정하지 않는다. */
+  g_rtos_metrics.wd_ms = status.wd_ms;
 
   g_rtos_metrics.closed_loop = status.closed_loop ? 1U : 0U;
   g_rtos_metrics.last_feed_ms = status.last_feed_ms;
@@ -364,6 +406,22 @@ static void control_task(void *argument)
       }
     }
 
+    if ((notify & CTRL_NOTIFY_CMDVEL) != 0U)
+    {
+      control_command_t cmd;
+
+      /* **결과를 게시하지 않는다.** s_result_queue는 레거시 ACK 상관관계 전용이고,
+         여기에 /cmd_vel의 결과를 섞으면 LegacyIoTask가 남의 결과를 자기 seq로
+         읽는다. /cmd_vel은 응답할 상대가 없으므로 결과를 버려도 잃는 것이 없다. */
+      while (xQueueReceive(s_cmdvel_queue, &cmd, 0U) == pdTRUE)
+      {
+        control_apply_result_t discarded;
+
+        control_core_on_command(&s_core, now_ms, &cmd, &discarded, &out);
+        control_apply_output(&out);
+      }
+    }
+
     if ((notify & CTRL_NOTIFY_FAULT) != 0U)
     {
       control_core_on_stop(&s_core, now_ms, take_pending_faults(), &out);
@@ -429,6 +487,10 @@ static void health_collect_stacks(void)
 #if U3_SMOKE_TEST
   g_rtos_metrics.stack_free_smoke_words =
       (uint32_t)uxTaskGetStackHighWaterMark(s_smoke_task);
+#endif
+#if MICRO_ROS
+  g_rtos_metrics.stack_free_micro_ros_words =
+      (uint32_t)uxTaskGetStackHighWaterMark(s_micro_ros_task);
 #endif
 }
 
@@ -510,6 +572,46 @@ static void health_task(void *argument)
     g_rtos_metrics.cmd_timeout_count = io.cmd_timeout_count;
     g_rtos_metrics.cmd_seq_mismatch_count = io.cmd_seq_mismatch_count;
     g_rtos_metrics.cmd_rejected_count = io.cmd_rejected_count;
+
+#if MICRO_ROS
+    {
+      micro_ros_metrics_t mr;
+
+      micro_ros_get_metrics(&mr);
+      g_rtos_metrics.mr_agent_state = mr.agent_state;
+      g_rtos_metrics.mr_connect_count = mr.connect_count;
+      g_rtos_metrics.mr_disconnect_count = mr.disconnect_count;
+      g_rtos_metrics.mr_ping_fail_count = mr.ping_fail_count;
+      g_rtos_metrics.mr_create_fail_count = mr.create_fail_count;
+      g_rtos_metrics.mr_spin_fail_count = mr.spin_fail_count;
+      g_rtos_metrics.mr_time_sync_count = mr.time_sync_count;
+      g_rtos_metrics.mr_time_sync_fail_count = mr.time_sync_fail_count;
+      g_rtos_metrics.mr_epoch_synchronized = mr.epoch_synchronized;
+      g_rtos_metrics.mr_cmd_vel_count = mr.cmd_vel_count;
+      g_rtos_metrics.mr_cmd_vel_applied_count = mr.cmd_vel_applied_count;
+      g_rtos_metrics.mr_cmd_vel_rejected_count = mr.cmd_vel_rejected_count;
+      g_rtos_metrics.mr_cmd_vel_last_verdict = mr.cmd_vel_last_verdict;
+      g_rtos_metrics.mr_cmd_vel_age_ms = mr.cmd_vel_age_ms;
+      g_rtos_metrics.mr_joint_states_count = mr.joint_states_count;
+      g_rtos_metrics.mr_joint_states_fail_count = mr.joint_states_fail_count;
+      g_rtos_metrics.mr_joint_states_stale_count = mr.joint_states_stale_count;
+      g_rtos_metrics.mr_base_status_count = mr.base_status_count;
+      g_rtos_metrics.mr_base_status_fail_count = mr.base_status_fail_count;
+      g_rtos_metrics.mr_pool_capacity = mr.pool_capacity;
+      g_rtos_metrics.mr_pool_free = mr.pool_free;
+      g_rtos_metrics.mr_pool_free_min = mr.pool_free_min;
+      g_rtos_metrics.mr_pool_largest_free = mr.pool_largest_free;
+      g_rtos_metrics.mr_pool_alloc_fail = mr.pool_alloc_fail;
+      g_rtos_metrics.mr_pool_invalid_free = mr.pool_invalid_free;
+      g_rtos_metrics.mr_pool_live_blocks = mr.pool_live_blocks;
+      g_rtos_metrics.mr_pool_escaped_alloc = mr.pool_escaped_alloc;
+      g_rtos_metrics.mr_uart1_error_count = mr.uart1_error_count;
+      g_rtos_metrics.mr_uart1_error_last = mr.uart1_error_last;
+      g_rtos_metrics.mr_uart1_rx_overflow_count = mr.uart1_rx_overflow_count;
+      g_rtos_metrics.mr_uart1_rearm_count = mr.uart1_rearm_count;
+      g_rtos_metrics.mr_uart1_tx_fail_count = mr.uart1_tx_fail_count;
+    }
+#endif
 
     health_collect_stacks();
 
@@ -790,8 +892,11 @@ void rtos_app_init(void)
                                       s_result_storage, &s_result_queue_cb);
   s_status_queue = xQueueCreateStatic(1U, sizeof(control_status_t),
                                       s_status_storage, &s_status_queue_cb);
+  s_cmdvel_queue = xQueueCreateStatic(1U, sizeof(control_command_t),
+                                      s_cmdvel_storage, &s_cmdvel_queue_cb);
 
-  if ((s_cmd_queue == NULL) || (s_result_queue == NULL) || (s_status_queue == NULL))
+  if ((s_cmd_queue == NULL) || (s_result_queue == NULL) ||
+      (s_status_queue == NULL) || (s_cmdvel_queue == NULL))
   {
     Error_Handler();
   }
@@ -822,6 +927,17 @@ void rtos_app_init(void)
                                    TASK_STACK_WORDS_SMOKE, NULL,
                                    TASK_PRIO_SMOKE, s_smoke_stack, &s_smoke_tcb);
   if (s_smoke_task == NULL)
+  {
+    Error_Handler();
+  }
+#endif
+
+#if MICRO_ROS
+  s_micro_ros_task = xTaskCreateStatic(micro_ros_task, "MicroRos",
+                                       TASK_STACK_WORDS_MICRO_ROS, NULL,
+                                       TASK_PRIO_MICRO_ROS, s_micro_ros_stack,
+                                       &s_micro_ros_tcb);
+  if (s_micro_ros_task == NULL)
   {
     Error_Handler();
   }

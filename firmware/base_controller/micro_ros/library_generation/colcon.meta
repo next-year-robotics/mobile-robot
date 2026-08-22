@@ -1,0 +1,79 @@
+{
+    "_comment": [
+        "micro-ROS 미들웨어의 메모리 정책. M5.md 8.1절이 근거다.",
+        "엔티티 상한은 interface/base_contract.md의 '토픽 요약' 표에서 곧장 나온다:",
+        "sub 1 (/cmd_vel) / pub 2 (/joint_states, /base/status) / node 1 / service 0 / client 0.",
+        "여유를 두지 않는 이유는 이 값이 RAM 상주 pool 크기를 그대로 정하기 때문이다.",
+        "토픽이 늘면 여기를 고치고 libmicroros.a를 다시 뽑는다 — 조용히 실패하는 대신",
+        "rcl_publisher_init이 RCL_RET_ERROR를 돌려주고 MicroRosTask가 그것을 계수한다.",
+        "",
+        "rmw_microxrcedds 메모리 정책 주석:",
+        "RMW_UXRCE_STREAM_HISTORY_INPUT/OUTPUT은 여기서 정하지 않는다. 2026-08-22",
+        "실측: 값을 줘도 config.h 템플릿이 #cmakedefine(값 치환 없음)이라 빈 define이",
+        "되고, 바로 아래 guard가 둘 다 4로 되돌린다. 즉 지정해도 upstream 기본값 4다.",
+        "MTU 512 x 4 = 입출력 스트림 버퍼 각 2 KB이며 그대로 받아들인다 — 엔티티 생성이",
+        "reliable 스트림을 타므로 여기를 줄이면 재접속이 느려질 수 있고, 아낄 양은 KB 단위다.",
+        "RMW_UXRCE_MAX_HISTORY=1은 다르다. 이건 값이 실제로 반영되며 KEEP_LAST(1) 계약과",
+        "같은 뜻이다 — 구독 하나당 입력 버퍼 2 KB로, 기본값 4였다면 8 KB였다.",
+        "",
+        "colcon.meta 주의: \"names\" 아래 값은 반드시 객체여야 한다. 2026-08-22 실측 —",
+        "주석용 키에 배열을 넣었더니 colcon이 \"names\" 매핑 전체를 조용히 버렸고,",
+        "RMW_UXRCE_TRANSPORT가 기본값 udp로 돌아가 rmw_microxrcedds 컴파일이 깨졌다.",
+        "설정이 반영됐는지는 libmicroros/rmw_microxrcedds_config.h로 매번 확인한다."
+    ],
+    "names": {
+        "tracetools": {
+            "cmake-args": [
+                "-DTRACETOOLS_DISABLED=ON",
+                "-DTRACETOOLS_STATUS_CHECKING_TOOL=OFF"
+            ]
+        },
+        "rosidl_typesupport": {
+            "cmake-args": [
+                "-DROSIDL_TYPESUPPORT_SINGLE_TYPESUPPORT=ON"
+            ]
+        },
+        "rcl": {
+            "cmake-args": [
+                "-DBUILD_TESTING=OFF",
+                "-DRCL_COMMAND_LINE_ENABLED=OFF",
+                "-DRCL_LOGGING_ENABLED=OFF"
+            ]
+        },
+        "rcutils": {
+            "cmake-args": [
+                "-DENABLE_TESTING=OFF",
+                "-DRCUTILS_NO_FILESYSTEM=ON",
+                "-DRCUTILS_NO_THREAD_SUPPORT=ON",
+                "-DRCUTILS_NO_64_ATOMIC=ON",
+                "-DRCUTILS_AVOID_DYNAMIC_ALLOCATION=ON"
+            ]
+        },
+        "microxrcedds_client": {
+            "cmake-args": [
+                "-DUCLIENT_PIC=OFF",
+                "-DUCLIENT_PROFILE_UDP=OFF",
+                "-DUCLIENT_PROFILE_TCP=OFF",
+                "-DUCLIENT_PROFILE_DISCOVERY=OFF",
+                "-DUCLIENT_PROFILE_SERIAL=OFF",
+                "-DUCLIENT_PROFILE_CUSTOM_TRANSPORT=ON",
+                "-DUCLIENT_PROFILE_STREAM_FRAMING=ON",
+                "-DUCLIENT_PROFILE_MULTITHREAD=OFF",
+                "-DUCLIENT_HARD_LIVELINESS_CHECK=OFF",
+                "-DUCLIENT_CUSTOM_TRANSPORT_MTU=512"
+            ]
+        },
+        "rmw_microxrcedds": {
+            "cmake-args": [
+                "-DRMW_UXRCE_MAX_NODES=1",
+                "-DRMW_UXRCE_MAX_PUBLISHERS=2",
+                "-DRMW_UXRCE_MAX_SUBSCRIPTIONS=1",
+                "-DRMW_UXRCE_MAX_SERVICES=0",
+                "-DRMW_UXRCE_MAX_CLIENTS=0",
+                "-DRMW_UXRCE_MAX_HISTORY=1",
+                "-DRMW_UXRCE_TRANSPORT=custom",
+                "-DRMW_UXRCE_ALLOW_DYNAMIC_ALLOCATIONS=OFF"
+            ]
+        }
+    }
+}

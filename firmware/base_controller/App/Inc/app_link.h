@@ -24,6 +24,19 @@
 bool app_link_post_command(const control_command_t *cmd);
 
 /**
+  * @brief  micro-ROS `/cmd_vel`이 만든 명령을 게시한다. **별도 mailbox다.**
+  * @note   레거시 ASCII 경로와 큐를 나눈 이유는 seq 충돌이다. 하나를 같이 쓰면
+  *         micro-ROS가 게시한 명령의 결과를 LegacyIoTask가 자기 seq의 결과로
+  *         읽어 `ok`를 잘못 보낼 수 있다 — 게시 순서에 따라 조용히 갈리는 실패다.
+  *         큐를 나누면 두 경로가 서로의 ACK를 오염시키지 못한다.
+  *
+  *         이쪽에는 결과 큐가 없다. `/cmd_vel`은 BEST_EFFORT이고 응답할 상대도
+  *         없으므로 적용 결과를 기다리지 않는다.
+  * @retval 게시하지 못했으면 false.
+  */
+bool app_link_post_cmd_vel(const control_command_t *cmd);
+
+/**
   * @brief  해당 seq의 적용 결과를 **상한 있는 시간** 동안 기다린다.
   * @retval 시간 안에 결과를 하나라도 받았으면 true (seq 일치 여부는 호출자가 본다).
   */
