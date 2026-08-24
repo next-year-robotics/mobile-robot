@@ -41,7 +41,7 @@ class OdomNode(Node):
     def __init__(self) -> None:
         super().__init__('mr_base')
 
-        self.declare_parameter('wheel_radius_m', 0.050)
+        self.declare_parameter('wheel_radius_m', 0.04979)
         self.declare_parameter('wheel_separation_m', 0.264)
         self.declare_parameter('odom_frame_id', 'odom')
         self.declare_parameter('base_frame_id', 'base_footprint')
