@@ -1,7 +1,7 @@
-"""`/joint_states` → `/odom` + `odom → base_footprint` TF (M6).
+"""`/joint_states` → `/odom` + `odom → base_footprint` TF.
 
 이 노드는 시리얼·게인·제어 주기·틱을 하나도 모른다. 파라미터가 순수 기하학뿐인 것이
-"오도메트리는 호스트, 제어는 MCU" 분리가 제대로 됐다는 증거다(base_contract.md).
+"오도메트리는 호스트, 제어는 MCU" 분리가 제대로 됐다는 증거다.
 
     ros2 run mr_base odom_node --ros-args --params-file config/base_params.yaml
 """
@@ -25,8 +25,8 @@ except ImportError:                                     # pragma: no cover
     # `/base/status`는 MCU reset 감지에만 쓴다. 없으면 그 기능만 꺼지고 나머지는 돈다.
     BaseStatus = None
 
-# base_contract.md: MCU가 발행하는 세 토픽은 전부 BEST_EFFORT, KEEP_LAST(1)이다.
-# 구독 QoS가 RELIABLE이면 호환되지 않아 데이터가 아예 오지 않는다.
+# MCU가 발행하는 세 토픽은 전부 BEST_EFFORT, KEEP_LAST(1)이다. 구독 QoS가 RELIABLE이면
+# 호환되지 않아 데이터가 아예 오지 않는다.
 MCU_QOS = QoSProfile(
     reliability=ReliabilityPolicy.BEST_EFFORT,
     history=HistoryPolicy.KEEP_LAST,
@@ -49,7 +49,7 @@ class OdomNode(Node):
         self.declare_parameter('right_wheel_joint', 'right_wheel_joint')
         self.declare_parameter('publish_tf', True)
         # wheel-only 오도메트리는 z/roll/pitch를 관측하지 못하고 횡슬립도 모른다.
-        # 0으로 두어 완전한 센서처럼 보이게 하지 않는다. U4/EKF에서 다시 맞춘다.
+        # 0으로 두어 완전한 센서처럼 보이게 하지 않는다. EKF를 붙일 때 다시 맞춘다.
         self.declare_parameter('pose_covariance_diagonal',
                                [1e-3, 1e-3, 1e6, 1e6, 1e6, 1e-2])
         self.declare_parameter('twist_covariance_diagonal',
@@ -108,10 +108,10 @@ class OdomNode(Node):
         if update is None:
             if self.odometry.counters.rebase_total > before:
                 reason = self.odometry.last_rebase_reason
-                # rclpy 로거는 **호출 지점(파일·행)마다** severity를 기억한다. 한 줄에서
+                # rclpy 로거는 호출 지점(파일·행)마다 severity를 기억한다. 한 줄에서
                 # info와 warn을 번갈아 부르면 두 번째 호출이
                 # `Logger severity cannot be changed between calls`로 죽는다.
-                # 실제로 MCU reset 때 노드가 이렇게 죽었다(2026-08-22). 줄을 나눈다.
+                # 그래서 줄을 나눠 둔다.
                 if reason == RebaseReason.FIRST_SAMPLE:
                     self.get_logger().info(f'재기준: {reason}')
                 else:
@@ -129,7 +129,7 @@ class OdomNode(Node):
     # ---------------------------------------------------------------- 발행
 
     def publish(self, update, stamp) -> None:
-        """`/odom`과 TF는 같은 입력 stamp와 같은 pose를 쓴다 (M6 3절)."""
+        """`/odom`과 TF는 같은 입력 stamp와 같은 pose를 쓴다."""
         half_yaw = 0.5 * update.yaw
         qz = math.sin(half_yaw)
         qw = math.cos(half_yaw)

@@ -49,9 +49,9 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN Variables */
 
 /* USER CODE END Variables */
-/* CubeMX는 FreeRTOS task를 최소 하나 요구하므로 .ioc에는 placeholder
-   defaultTask가 남아 있다. application task는 전부 App/Src/rtos_app.c가 native
-   xTaskCreateStatic으로 만들며, 생성 직후 아래 placeholder 정의/생성/함수를 다시
+/* CubeMX는 FreeRTOS task를 최소 하나 요구하므로 .ioc에는 placeholder defaultTask가
+   남아 있다. application task는 전부 App/Src/rtos_app.c가 native
+   xTaskCreateStatic으로 만든다. 생성 직후 아래 placeholder 정의/생성/함수를 다시
    제거한다. */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -123,8 +123,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* application task와 mailbox는 전부 여기서 static으로 만든다. 이 호출이 끝난
-     뒤에야 TIM6/USART2 인터럽트가 켜지므로, handle 없는 ISR이 뜰 수 없다. */
+  /* application task와 mailbox는 전부 여기서 static으로 만든다. TIM6/USART2
+     인터럽트는 이 호출이 끝난 뒤에 켜지므로 handle 없는 ISR이 뜰 수 없다. */
   rtos_app_init();
   /* USER CODE END RTOS_THREADS */
 

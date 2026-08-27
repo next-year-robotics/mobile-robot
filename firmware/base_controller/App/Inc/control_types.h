@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    control_types.h
   * @brief   ControlTask와 나머지 task가 주고받는 고정 크기 snapshot 타입.
-  * @note    HAL/RTOS 비의존. 여기에 FreeRTOS 타입이나 HAL 헤더를 들이지 않는다 —
+  * @note    HAL/RTOS 비의존. 여기에 FreeRTOS 타입이나 HAL 헤더를 들이지 않는다.
   *          들어오는 순간 host 단위 테스트가 깨진다.
   *
   *          task 사이의 multi-field/int64 전달은 전부 이 구조체 단위로만 한다.
@@ -20,9 +20,8 @@
 
 /**
   * @brief  ControlTask가 받는 지령의 종류.
-  * @note   duty와 vel은 **모드**다. 한쪽으로 지령하면 그 모드가 유지되며, 모드가
-  *         바뀌는 순간 적분기를 리셋한다. stop은 모드를 바꾸지 않고 목표만 0으로
-  *         만든다 (M4.md 4.1).
+  * @note   duty와 vel은 모드다. 한쪽으로 지령하면 그 모드가 유지된다. 모드가 바뀌는
+  *         순간 적분기를 리셋한다. stop은 모드를 바꾸지 않고 목표만 0으로 만든다.
   */
 typedef enum
 {
@@ -58,10 +57,10 @@ typedef enum
   * @note   `ok`는 이 결과가 CONTROL_APPLY_OK이고 seq가 일치할 때만 나간다.
   *         "queue에 넣었다"는 사실은 ACK 근거가 아니다.
   *
-  *         `left`/`right`는 **ACK에 실릴 값**이며 단위는 명령 종류를 따른다:
-  *         duty면 클램프 뒤 ‰, vel이면 클램프 뒤 목표 tps, stop이면 0이다.
-  *         `ok <ms> <a> <b>` 형식을 바꾸지 않기 위한 것이다 — 호스트 툴의
-  *         "보낸 값과 ok의 값이 다르면 즉시 정지" 검사를 명령마다 따로 쓰지 않는다.
+  *         `left`/`right`는 ACK에 실릴 값이며 단위는 명령 종류를 따른다. duty면
+  *         클램프 뒤 ‰, vel이면 클램프 뒤 목표 tps, stop이면 0이다. `ok <ms> <a> <b>`
+  *         형식은 바꾸지 않는다. 그래야 호스트 쪽의 "보낸 값과 ok의 값이 다르면 즉시
+  *         정지" 검사를 명령마다 따로 쓰지 않아도 된다.
   */
 typedef struct
 {
@@ -91,7 +90,7 @@ typedef struct
   uint32_t loop_overruns;
   bool     output_allowed;    /* 지금 duty가 CCR에 실릴 수 있는가 */
 
-  /* ---- 속도 폐루프 (M4) ---- */
+  /* ---- 속도 폐루프 ---- */
 
   /* 마지막으로 워치독을 먹인 시각. MCU 내부 만료 판정을 SWD로 확인하는 기준이다.
      호스트 wall-clock에는 UART와 스케줄링 지연이 더해지므로 그쪽으로 판정하지 않는다. */
@@ -101,7 +100,7 @@ typedef struct
   int32_t  target_tps_right;
   int32_t  measured_tps_left;  /* 이번 표본의 측정 속도(반올림). 와이어는 정수다. */
   int32_t  measured_tps_right;
-  int32_t  duty_left_pm;       /* 이번 cycle에 **실제로 CCR에 실린** duty */
+  int32_t  duty_left_pm;       /* 이번 cycle에 실제로 CCR에 실린 duty */
   int32_t  duty_right_pm;
   /* 적분기 값. rtos_metrics/telemetry를 정수로 유지하기 위해 ‰ x 1000으로 싣는다. */
   int32_t  integrator_left_mpm;

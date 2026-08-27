@@ -3,7 +3,7 @@
   * @file    control_core.h
   * @brief   100 Hz ControlTask 한 cycle의 순수 상태기계.
   * @note    HAL/RTOS 비의존. 레지스터를 만지지 않고 "무엇을 써야 하는지"만 만든다.
-  *          개루프 duty 경로(M3)와 속도 폐루프(M4)를 **모드**로 나란히 갖는다.
+  *          개루프 duty 경로와 속도 폐루프를 모드로 나란히 갖는다.
   *          FF/PI 자체는 speed_control.c에 있고 여기서는 표본을 만들고 언제
   *          적분을 진행할지를 정한다.
   ******************************************************************************
@@ -20,8 +20,8 @@
 #include "speed_control.h"
 
 /**
-  * @brief  좌우 계수. app_config.h의 확정값으로 초기화되며 **튜닝 중 SWD로
-  *         덮어쓸 수 있도록** const가 아니다.
+  * @brief  좌우 계수. app_config.h의 확정값으로 초기화된다. 튜닝 중 SWD로 덮어쓸 수
+  *         있도록 const가 아니다.
   * @note   확정된 값은 반드시 app_config.h로 되돌려 커밋한다. SWD로만 존재하는
   *         게인은 재현할 수 없다.
   */
@@ -74,12 +74,10 @@ void control_core_init(control_core_t *c, uint32_t now_ms,
   * @note   워치독 평가가 100 Hz로 양자화되므로 정지는 마지막 유효 명령 뒤
   *         CMD_WATCHDOG_MS ~ CMD_WATCHDOG_MS + CONTROL_PERIOD_MS 사이에 일어난다.
   *
-  *         속도 추정은 tick_delta로 나눈다:
+  *         속도 추정은 tick_delta로 나눈다.
   *           measured_tps = delta_ticks * CONTROL_RATE_HZ / tick_delta
-  *         병합된 tick(tick_delta > 1)에서 무조건 100을 곱하면 속도가 tick_delta배로
-  *         튄다. 그런 표본으로 출력은 다시 계산하되 **적분기는 진행시키지 않는다** —
-  *         긴 구간의 평균 하나로 과거의 여러 제어 출력을 재현할 수 없고, CPU가 이미
-  *         늦은 순간에 큰 적분 변화를 더하는 것보다 한 표본을 보류하는 편이 안전하다.
+  *         병합된 tick에서는 출력만 다시 계산하고 적분기는 진행시키지 않는다. 긴 구간의
+  *         평균 하나로 과거의 여러 제어 출력을 재현할 수 없기 때문이다.
   */
 void control_core_on_tick(control_core_t *c, uint32_t now_ms, uint32_t tick_seq,
                           uint16_t enc_left_raw, uint16_t enc_right_raw,
@@ -90,10 +88,10 @@ void control_core_on_tick(control_core_t *c, uint32_t now_ms, uint32_t tick_seq,
   * @note   fault 래치나 기한 초과면 duty를 반영하지 않고 CONTROL_APPLY_REJECTED다.
   *         호출자는 이 결과가 OK일 때만 `ok`를 보낼 수 있다.
   *
-  *         폐루프에서는 **새 FF + 새 P + 기존 I**로 즉시 출력을 다시 계산한다.
-  *         `Ki_cycle * error`를 더하지는 않는다 — 진행되는 적분의 dT를 정확히 한
-  *         주기로 고정해, 명령이 비주기적으로 들어와도 적분 이득이 지령 주기에
-  *         따라 달라지지 않게 한다 (M4.md 3.4).
+  *         폐루프에서는 새 FF + 새 P + 기존 I로 즉시 출력을 다시 계산한다. `Ki_cycle
+  *         * error`를 더하지는 않는다. 진행되는 적분의 dT는 정확히 한 주기로
+  *         고정한다. 그래야 명령이 비주기적으로 들어와도 적분 이득이 지령 주기에 따라
+  *         달라지지 않는다.
   */
 void control_core_on_command(control_core_t *c, uint32_t now_ms,
                              const control_command_t *cmd,

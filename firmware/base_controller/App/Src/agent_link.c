@@ -54,8 +54,8 @@ agent_action_t agent_link_next(const agent_link_t *l, uint32_t now_ms)
       return AGENT_ACTION_CREATE;
 
     case AGENT_STATE_CONNECTED:
-      /* **ping이 spin보다 앞선다.** 링크가 죽은 채로 executor만 돌리면 끊김을
-         영영 알아차리지 못하고 엔티티도 다시 만들지 못한다. */
+      /* ping이 spin보다 앞선다. 링크가 죽은 채로 executor만 돌리면 끊김을 영영
+         알아차리지 못하고 엔티티도 다시 만들지 못한다. */
       return due(now_ms, l->next_ping_ms) ? AGENT_ACTION_PING : AGENT_ACTION_SPIN;
 
     case AGENT_STATE_DISCONNECTED:
@@ -168,7 +168,7 @@ void agent_link_report(agent_link_t *l, uint32_t now_ms, agent_action_t action,
         break;
       }
       /* 정리가 실패해도 WAITING으로 간다. 부수지 못한 엔티티를 붙들고 있어 봐야
-         다시 연결할 방법이 없고, 다음 create가 같은 자리를 덮는다. */
+         다시 연결할 방법이 없다. 다음 create가 같은 자리를 덮는다. */
       l->ping_fail_streak = 0U;
       l->backoff_ms = AGENT_BACKOFF_MIN_MS;
       l->next_ping_ms = now_ms + AGENT_BACKOFF_MIN_MS;
@@ -219,8 +219,8 @@ cmd_stamp_verdict_t agent_link_check_stamp(bool epoch_synced, int64_t stamp_ns,
 
   if (age_ns < 0)
   {
-    /* 미래다. 동기 오차 수준이면 나이 0으로 받아들이고, 그보다 멀면 시계가
-       어긋난 것으로 본다 — 받아들이면 워치독이 영영 만료되지 않는다. */
+    /* 미래다. 동기 오차 수준이면 나이 0으로 받아들이고 그보다 멀면 시계가 어긋난
+       것으로 본다. 받아들이면 워치독이 영영 만료되지 않는다. */
     return (-age_ns <= max_age_ns) ? CMD_STAMP_OK : CMD_STAMP_FUTURE;
   }
 

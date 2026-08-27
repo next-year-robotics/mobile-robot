@@ -112,7 +112,7 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   /* TIM1 ARR 대조, CCR 0 확정, PWM/엔코더 기동, DWT 활성화까지 여기서 끝난다.
-     인터럽트 원(USART2 RX, TIM6)은 여기서 켜지 않는다 — task handle과 static
+     인터럽트 원(USART2 RX, TIM6)은 여기서 켜지 않는다. task handle과 static
      mailbox가 생긴 뒤 각 소유 task의 첫머리에서 시작한다. */
   if (!app_init())
   {
@@ -134,9 +134,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* scheduler가 돌아왔다는 것은 커널을 시작하지 못했다는 뜻이다. M3 super-loop는
-       ControlTask/LegacyIoTask로 옮겨 갔으므로 여기서 app_step()을 부르지 않는다.
-       모터를 끊고 멈춘다. */
+    /* scheduler가 돌아왔다면 커널을 시작하지 못한 것이다. 애플리케이션은
+       ControlTask/LegacyIoTask 안에서 도므로 여기서 할 일이 없다. 모터를 끊고
+       멈춘다. */
     Error_Handler();
     /* USER CODE END WHILE */
 
@@ -225,8 +225,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* 여기서 멈추는 순간 모터가 돌고 있을 수 있다. 소프트웨어 워치독은 super-loop가
-     돌아야 동작하므로 무한 루프에 들어가기 전에 직접 끈다. */
+  /* 여기서 멈추는 순간 모터가 돌고 있을 수 있다. 소프트웨어 워치독은 task가 돌아야
+     동작하므로 무한 루프에 들어가기 전에 직접 끈다. */
   platform_motor_kill();
 
   /* User can add his own implementation to report the HAL error return state */

@@ -77,19 +77,12 @@ static void *mr_zero_allocate(size_t count, size_t size, void *state)
 }
 
 /* ---- newlib heap 차단 ----
-   rcutils의 **기본** allocator가 malloc/calloc/realloc/free를 직접 부른다. 우리는
-   부팅 직후 rcutils_set_default_allocator()로 그 포인터를 갈아 끼우므로 정상 경로에서
-   libc heap이 쓰이는 일은 없다. 그런데 링커는 그 기본 구현 때문에 newlib malloc과
-   _sbrk 기반 heap을 그대로 image에 끌고 들어온다 — **쓰이지 않는다는 보장이 아니라
-   쓰일 자리가 남아 있다는 뜻이다.**
+   rcutils_set_default_allocator()로 갈아 끼우므로 정상 경로에서 libc heap이 쓰이는 일은
+   없다. 다만 링커가 rcutils 기본 구현 때문에 newlib malloc과 _sbrk heap을 image에 끌고
+   들어오므로, 쓰일 자리 자체가 남는다.
 
-   그래서 네 심볼을 우리 것으로 덮어 pool 하나로 모은다. 얻는 것은 두 가지다:
-     1. 어떤 경로로 새더라도 메모리는 여전히 상한이 있는 pool 안에 있다.
-     2. `escaped_alloc_count`가 0이 아니면 "rcutils allocator를 우회한 할당이
-        있었다"는 사실이 계측값으로 드러난다. 지금은 조용히 일어날 수 없다.
-
-   FreeRTOS heap과는 무관하다. 그쪽은 configSUPPORT_DYNAMIC_ALLOCATION=0으로
-   애초에 존재하지 않는다. */
+   네 심볼을 덮어 pool 하나로 모으면 어떤 경로로 새더라도 상한 안에 머문다.
+   `escaped_alloc_count`가 0이 아닌 것으로 우회 할당이 드러난다. */
 
 static uint32_t s_escaped_alloc_count;
 
@@ -122,9 +115,9 @@ void free(void *pointer)
 
 /**
   * @brief  newlib에 없는 monotonic clock을 FreeRTOS tick으로 채운다.
-  * @note   **libmicroros.a가 이 심볼을 필요로 한다.** 라이브러리를 `-DCLOCK_MONOTONIC=0`
-  *         으로 빌드했으므로 clock_id는 무시해도 된다. 분해능은 tick 하나(1 ms)이고,
-  *         micro-ROS는 이 시계를 내부 타임아웃에만 쓴다 — `/joint_states`의 stamp는
+  * @note   libmicroros.a가 이 심볼을 필요로 한다. 라이브러리를 `-DCLOCK_MONOTONIC=0`
+  *         으로 빌드했으므로 clock_id는 무시해도 된다. 분해능은 tick 하나(1 ms)다.
+  *         micro-ROS는 이 시계를 내부 타임아웃에만 쓴다. `/joint_states`의 stamp는
   *         여기가 아니라 `rmw_uros_epoch_nanos()`에서 온다.
   *
   *         overflow count를 vTaskSetTimeOutState로 얻는다. 49.7일마다 감기는 tick을
@@ -158,10 +151,10 @@ int clock_gettime(clockid_t clock_id, struct timespec *tp)
 
 /**
   * @brief  트랜스포트는 이미 열려 있다.
-  * @note   DMA 수신은 task 첫머리에서 platform_uart1_start()로 **한 번만** 건다.
-  *         여기서 다시 걸지 않는 이유: 재접속마다 열고 닫으면 그때마다 DMA 링의
-  *         tail이 되감기고, 링에 남아 있던 프레임 조각이 유효 바이트로 읽힌다.
-  *         링크는 세션과 무관하게 늘 살아 있는 것이 이 설계의 전제다.
+  * @note   DMA 수신은 task 첫머리에서 platform_uart1_start()로 한 번만 건다. 여기서
+  *         다시 걸지 않는 이유: 재접속마다 열고 닫으면 그때마다 DMA 링의 tail이
+  *         되감긴다. 링에 남아 있던 프레임 조각이 유효 바이트로 읽힌다. 링크는 세션과
+  *         무관하게 늘 살아 있는 것이 이 설계의 전제다.
   */
 static bool transport_open(struct uxrCustomTransport *transport)
 {
@@ -188,9 +181,9 @@ static size_t transport_write(struct uxrCustomTransport *transport,
   }
 
   /* 유한 타임아웃 블로킹이다. MTU 512 B는 921600에서 5.6 ms이고 상한은 20 ms라
-     3.5배 여유가 있다. TX DMA를 쓰지 않는 이유는 U3에서 이 경로가 30,000줄
-     무결로 검증됐고(M5.md 7.4), MicroRosTask가 ControlTask/HealthTask보다
-     낮은 우선순위라 이 대기가 제어나 IWDG를 막을 수 없기 때문이다. */
+     3.5배 여유가 있다. TX DMA는 쓰지 않는다. MicroRosTask가
+     ControlTask/HealthTask보다 낮은 우선순위라 이 대기가 제어나 IWDG를 막을 수 없기
+     때문이다. */
   if (!platform_uart1_write(buffer, length))
   {
     if (error_code != NULL)
@@ -218,7 +211,7 @@ static size_t transport_read(struct uxrCustomTransport *transport,
   }
 
   /* 한 번의 FE/NE/PE/ORE로 링크가 영구히 죽지 않게 하는 그물. HAL은 DMA 수신 중
-     오류를 blocking error로 보고 수신을 끊으므로, 소유 task가 여기서 되살린다
+     오류를 blocking error로 보고 수신을 끊으므로 소유 task가 여기서 되살린다
      (platform_uart1.h). */
   (void)platform_uart1_rearm_if_needed();
 
@@ -232,8 +225,7 @@ static size_t transport_read(struct uxrCustomTransport *transport,
   while ((int32_t)(platform_now_ms() - deadline_ms) < 0)
   {
     /* IDLE 인터럽트 대신 tick 단위 폴링이다. 921600에서 1 ms는 92 B이고 링은
-       2048 B라 22배 여유가 있다. 움직이는 부품을 늘리지 않는 쪽을 고른 것은
-       6.3절과 같은 판단이다. */
+       2048 B라 22배 여유가 있다. 움직이는 부품을 늘리지 않는 쪽을 골랐다. */
     vTaskDelay(pdMS_TO_TICKS(MICRO_ROS_TRANSPORT_POLL_MS));
 
     (void)platform_uart1_rearm_if_needed();
@@ -251,8 +243,8 @@ static size_t transport_read(struct uxrCustomTransport *transport,
 /* 정적 메시지 메모리                                                          */
 /* ------------------------------------------------------------------------- */
 
-/* `/joint_states`. 가변 길이 배열의 실체를 전부 여기서 미리 잡는다 — 발행 경로에서
-   단 한 바이트도 할당하지 않는다 (M5.md 8.2절 3항). */
+/* `/joint_states`. 가변 길이 배열의 실체를 전부 여기서 미리 잡는다. 발행 경로에서는
+   단 한 바이트도 할당하지 않는다. */
 static sensor_msgs__msg__JointState s_joint_state;
 static rosidl_runtime_c__String     s_joint_names[2];
 static char s_joint_name_left[sizeof(BASE_JOINT_NAME_LEFT)];
@@ -292,12 +284,12 @@ static void message_memory_init(void)
   memset(&s_joint_state, 0, sizeof(s_joint_state));
   memset(&s_cmd_vel, 0, sizeof(s_cmd_vel));
 
-  /* JointState는 frame을 쓰지 않는다 (base_contract.md 2절). 빈 문자열이지만
-     capacity 1은 있어야 직렬화가 '\0'을 쓸 자리를 갖는다. */
+  /* JointState는 frame을 쓰지 않는다. 빈 문자열이지만 capacity 1은 있어야 직렬화가
+     '\0'을 쓸 자리를 갖는다. */
   bind_string(&s_joint_state.header.frame_id, s_joint_frame_id,
               sizeof(s_joint_frame_id), "");
 
-  /* **이 순서가 계약이다.** left가 먼저다. */
+  /* 이 순서가 계약이다. left가 먼저다. */
   bind_string(&s_joint_names[0], s_joint_name_left, sizeof(s_joint_name_left),
               BASE_JOINT_NAME_LEFT);
   bind_string(&s_joint_names[1], s_joint_name_right, sizeof(s_joint_name_right),
@@ -315,8 +307,8 @@ static void message_memory_init(void)
   s_joint_state.velocity.size = 2U;
   s_joint_state.velocity.capacity = 2U;
 
-  /* effort는 **길이 0**이다. 토크 센서가 없으므로 0을 채워 넣지 않는다 —
-     0이 흐르는 필드를 누군가 신뢰한다. */
+  /* effort는 길이 0이다. 토크 센서가 없으므로 0을 채워 넣지 않는다. 0이 흘러 나가면
+     누군가는 그걸 측정값으로 믿는다. */
   s_joint_state.effort.data = NULL;
   s_joint_state.effort.size = 0U;
   s_joint_state.effort.capacity = 0U;
@@ -346,7 +338,7 @@ static agent_link_t       s_link;
 static micro_ros_metrics_t s_metrics;
 
 /* /cmd_vel이 ControlTask로 갈 때 쓰는 sequence. 레거시 ASCII 경로와 값이 겹치지
-   않게 최상위 bit를 세워 둔다 — g_rtos_metrics.applied_seq만 보고도 마지막 명령이
+   않게 최상위 bit를 세워 둔다. g_rtos_metrics.applied_seq만 보고도 마지막 명령이
    어느 경로에서 왔는지 알 수 있다. */
 #define CMD_VEL_SEQ_BASE  0x80000000UL
 static uint32_t s_cmd_vel_seq;
@@ -383,8 +375,8 @@ static void cmd_vel_callback(const void *message)
 
   if (verdict != CMD_STAMP_OK)
   {
-    /* **거절한 명령은 워치독을 먹이지 않는다.** 그래야 낡은 명령만 계속 오는
-       상황에서 MCU가 스스로 정지한다 (base_contract.md 1절). */
+    /* 거절한 명령은 워치독을 먹이지 않는다. 그래야 낡은 명령만 계속 오는 상황에서
+       MCU가 스스로 정지한다. */
     s_metrics.cmd_vel_rejected_count++;
     return;
   }
@@ -407,9 +399,9 @@ static void cmd_vel_callback(const void *message)
   cmd.left = tps_left;
   cmd.right = tps_right;
 
-  /* **명령의 나이만큼 기한을 앞당긴다.** accepted_ms를 지금으로 두면 200 ms 늦게
-     도착한 명령이 200 ms를 새로 얻는다. 생성 시각 기준 판정의 의미가 그 자리에서
-     사라지므로, 이미 흐른 시간을 빼서 넘긴다. */
+  /* 명령의 나이만큼 기한을 앞당긴다. accepted_ms를 지금으로 두면 200 ms 늦게 도착한
+     명령이 200 ms를 새로 얻고 생성 시각 기준 판정의 의미가 그 자리에서 사라진다.
+     이미 흐른 시간을 빼서 넘긴다. */
   cmd.accepted_ms = now_ms - age_ms;
   cmd.deadline_ms = cmd.accepted_ms + CMD_WATCHDOG_MS;
 
@@ -433,9 +425,9 @@ static bool entities_create(void)
   rcl_ret_t ret;
 
   /* 생성 전에 0으로 둔다. 중간에 실패하면 호출자가 곧바로 entities_destroy()를
-     부르는데, 그때 **아직 만들지 않은** 엔티티에도 fini가 간다. rcl의 fini는
-     impl == NULL을 안전하게 처리하도록 돼 있지만, 그 성질에 기대는 대신 상태를
-     확정해 둔다 — 부분 실패 경로는 자주 지나가지 않아 틀려도 늦게 발견된다. */
+     부른다. 그때 아직 만들지 않은 엔티티에도 fini가 간다. rcl의 fini는 impl ==
+     NULL을 안전하게 처리하도록 돼 있지만 그 성질에 기대는 대신 상태를 확정해 둔다.
+     부분 실패 경로는 자주 지나가지 않아 틀려도 늦게 발견된다. */
   memset(&s_support, 0, sizeof(s_support));
   memset(&s_node, 0, sizeof(s_node));
   memset(&s_pub_joint_states, 0, sizeof(s_pub_joint_states));
@@ -498,8 +490,8 @@ static bool entities_create(void)
     return false;
   }
 
-  /* 시간 동기는 여기서 처음 시도하고, 실패하면 CONNECTED 안에서 재시도한다.
-     동기 전에는 어떤 /cmd_vel도 실행하지 않으므로 연결 자체를 막을 필요는 없다. */
+  /* 시간 동기는 여기서 처음 시도하고 실패하면 CONNECTED 안에서 재시도한다. 동기
+     전에는 어떤 /cmd_vel도 실행하지 않으므로 연결 자체를 막을 필요는 없다. */
   s_next_time_sync_ms = platform_now_ms();
   return true;
 }
@@ -513,9 +505,8 @@ static bool entities_destroy(void)
     return true;
   }
 
-  /* agent가 사라진 뒤라 fini가 응답을 기다리다 실패할 수 있다. 그래도 **끝까지
-     전부 부순다** — 하나가 실패했다고 멈추면 나머지가 pool에 남아 재접속마다
-     누수가 쌓인다. */
+  /* agent가 사라진 뒤라 fini가 응답을 기다리다 실패할 수 있다. 그래도 끝까지 전부
+     부순다. 하나가 실패했다고 멈추면 나머지가 pool에 남아 재접속마다 누수가 쌓인다. */
   if (rcl_publisher_fini(&s_pub_joint_states, &s_node) != RCL_RET_OK)
   {
     ok = false;
@@ -561,15 +552,14 @@ static void publish_joint_states(uint32_t now_ms)
     return;
   }
 
-  /* **snapshot이 만들어진 시각으로 stamp를 되돌린다.** 지금 시각을 그대로 쓰면
-     최대 한 control cycle(10 ms)만큼 늦은 데이터에 최신 시각을 붙이는 셈이고,
-     `ros2 topic delay`가 그 오차를 못 본다.
+  /* snapshot이 만들어진 시각으로 stamp를 되돌린다. 지금 시각을 그대로 쓰면 최대 한
+     control cycle(10 ms)만큼 늦은 데이터에 최신 시각을 붙이는 셈이다. `ros2 topic
+     delay`는 그 오차를 못 본다.
 
-     나이는 **부호 있는** 뺄셈으로 잰다. now_ms를 읽은 뒤 최고 우선순위인
-     ControlTask가 선점해 더 새로운 snapshot을 게시하면 status.timestamp_ms가
-     now_ms보다 커지는데, 그때 unsigned로 빼면 약 4.29e9 ms(49.7일)가 나와
-     stamp가 49.7일 과거로 날아간다. 2026-08-22 실기에서 실제로 관측했다
-     (`delay 최대 4294967303 ms`). 음수 나이는 0으로 눌러 "지금"으로 본다. */
+     나이는 부호 있는 뺄셈으로 잰다. now_ms를 읽은 뒤 최고 우선순위인 ControlTask가
+     선점해 더 새로운 snapshot을 게시하면 status.timestamp_ms가 now_ms보다 커진다.
+     그때 unsigned로 빼면 약 4.29e9 ms(49.7일)가 나와 stamp가 49.7일 과거로
+     날아간다. 음수 나이는 0으로 눌러 지금으로 본다. */
   age_ms = (int32_t)(now_ms - status.timestamp_ms);
   if (age_ms < 0)
   {
@@ -577,8 +567,8 @@ static void publish_joint_states(uint32_t now_ms)
   }
   else if (age_ms > JOINT_STATES_MAX_AGE_MS)
   {
-    /* 여기까지 늙은 snapshot은 ControlTask가 멈췄다는 뜻이다. 그런 값에 정확한
-       과거 시각을 붙여 오도메트리가 조용히 적분하게 두지 않는다. */
+    /* snapshot이 여기까지 늙었다면 ControlTask가 멈췄다. 그런 값에 정확한 과거
+       시각을 붙여 오도메트리가 조용히 적분하게 두지 않는다. */
     age_ms = JOINT_STATES_MAX_AGE_MS;
     s_metrics.joint_states_stale_count++;
   }
@@ -602,7 +592,7 @@ static void publish_joint_states(uint32_t now_ms)
   }
   else
   {
-    /* 발행 실패로 엔티티를 부수지 않는다. 링크 생사 판정은 ping 하나가 맡는다 —
+    /* 발행 실패로 엔티티를 부수지 않는다. 링크 생사 판정은 ping 하나가 맡는다.
        판정자가 둘이면 어느 쪽이 옳은지 알 수 없다. */
     s_metrics.joint_states_fail_count++;
   }
@@ -630,9 +620,9 @@ static void publish_base_status(uint32_t now_ms)
 
   s_base_status.agent_state = (uint8_t)s_link.state;
 
-  /* **`last_feed_ms`는 이미 stamp 시각이다.** cmd_vel 콜백이 accepted_ms를 명령
-     나이만큼 앞당겨 넘기므로, 여기서 재는 것이 곧 `now - header.stamp`다 —
-     계약이 요구하는 값 그대로이고 epoch 동기 여부와 무관하게 성립한다. */
+  /* `last_feed_ms`는 이미 stamp 시각이다. cmd_vel 콜백이 accepted_ms를 명령
+     나이만큼 앞당겨 넘기므로 여기서 재는 것이 곧 `now - header.stamp`다. 계약이
+     요구하는 값 그대로이고 epoch 동기 여부와 무관하게 성립한다. */
   cmd_age_ms = (uint32_t)(now_ms - status.last_feed_ms);
   s_base_status.cmd_age_s = (float)cmd_age_ms * 0.001f;
   s_base_status.cmd_watchdog_ok = (cmd_age_ms <= CMD_WATCHDOG_MS);
@@ -666,8 +656,8 @@ static bool spin_once(uint32_t now_ms)
   if ((int32_t)(now_ms - s_next_time_sync_ms) >= 0)
   {
     /* 최초 동기와 주기 재동기를 같은 자리에서 한다. 다른 것은 타임아웃과 다음
-       시각뿐이다 — 아직 동기 전이면 자주 다시 시도하고, 이미 동기됐으면 30초
-       뒤에 짧게 갱신한다 (app_config.h의 22 ppm 실측 근거 참조). */
+       시각뿐이다. 아직 동기 전이면 자주 다시 시도하고 이미 동기됐으면 30초 뒤에
+       짧게 갱신한다. 주기의 근거는 app_config.h에 있다. */
     bool was_synced = rmw_uros_epoch_synchronized();
     int timeout_ms = was_synced ? (int)AGENT_TIME_SYNC_RESYNC_TIMEOUT_MS
                                 : (int)AGENT_TIME_SYNC_TIMEOUT_MS;
@@ -772,8 +762,8 @@ void micro_ros_task(void *argument)
   s_escaped_alloc_count = 0U;
   s_entities_created = false;
 
-  /* **allocator를 먼저 세운다.** rcl은 첫 호출부터 할당한다. 여기가 늦으면
-     그 할당이 newlib malloc으로 새어 나가고, 그때는 이미 관측할 방법이 없다. */
+  /* allocator를 먼저 세운다. rcl은 첫 호출부터 할당한다. 여기가 늦으면 그 할당이
+     newlib malloc으로 새어 나가고 그때는 이미 관측할 방법이 없다. */
   static_pool_init(&s_pool, s_pool_memory, sizeof(s_pool_memory));
 
   allocator = rcutils_get_zero_initialized_allocator();
@@ -784,9 +774,9 @@ void micro_ros_task(void *argument)
   allocator.state = NULL;
   if (!rcutils_set_default_allocator(&allocator))
   {
-    /* Error_Handler()가 아니라 rtos_app_fatal()이다. 둘 다 멈추지만 이쪽은
-       모터를 먼저 끊는다 — 여기 도달했다는 것은 micro-ROS를 세울 수 없다는 뜻이고,
-       그 상태로 마지막 PWM을 남겨 둘 이유가 없다. */
+    /* Error_Handler()가 아니라 rtos_app_fatal()이다. 둘 다 멈추지만 이쪽은 모터를
+       먼저 끊는다. 여기 도달했으면 micro-ROS를 세울 수 없다. 그 상태로 마지막 PWM을
+       남겨 둘 이유가 없다. */
     rtos_app_fatal();
   }
 
@@ -855,8 +845,8 @@ void micro_ros_task(void *argument)
 
     if (agent_link_take_stop_request(&s_link))
     {
-      /* 래치하지 않는 정지다. reset이나 버튼 없이 재접속만으로 되살아나야 한다
-         (M5.md 8.4절). 정지 자체는 MCU 내부 200 ms 워치독도 따로 보장한다. */
+      /* 래치하지 않는 정지다. reset이나 버튼 없이 재접속만으로 되살아나야 한다.
+         정지 자체는 MCU 내부 200 ms 워치독도 따로 보장한다. */
       app_link_urgent_stop(MOTOR_FAULT_NONE);
     }
 

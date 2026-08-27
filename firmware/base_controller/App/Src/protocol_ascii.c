@@ -60,7 +60,7 @@ static bool parse_i32(const char **cursor, int32_t *out)
 
 /**
   * @brief  남은 꼬리가 공백뿐인지 검사한다.
-  * @note   "duty 1 2 3"을 거절하는 지점이다. 값을 다 읽었다고 줄이 유효한 것이 아니다.
+  * @note   "duty 1 2 3"을 거절하는 지점이다. 값을 다 읽었다고 줄이 유효하지는 않다.
   */
 static bool at_end(const char *p)
 {

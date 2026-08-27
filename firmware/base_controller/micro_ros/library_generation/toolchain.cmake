@@ -1,10 +1,9 @@
 # libmicroros.a cross-build toolchain.
 #
-# **이 파일의 flag는 cmake/gcc-arm-none-eabi.cmake와 ABI가 같아야 한다.**
-# -mcpu / -mfpu / -mfloat-abi 세 가지가 어긋나면 링크는 통과하고 런타임에 깨진다.
-# 최적화 수준은 달라도 된다 — 애플리케이션은 -O0(Debug)이고 여기는 -O2다.
-# micro-ROS를 -O0으로 빌드하면 FLASH가 수백 KB 늘어나는데, 이 라이브러리는
-# 우리가 디버깅할 코드가 아니다.
+# 이 파일의 flag는 cmake/gcc-arm-none-eabi.cmake와 ABI가 같아야 한다. -mcpu / -mfpu /
+# -mfloat-abi 세 가지가 어긋나면 링크는 통과하고 런타임에 깨진다. 최적화 수준은 달라도
+# 된다. 애플리케이션은 -O0(Debug)이고 여기는 -O2다. micro-ROS를 -O0으로 빌드하면
+# FLASH가 수백 KB 늘어난다. 이 라이브러리는 우리가 디버깅할 코드가 아니다.
 
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)

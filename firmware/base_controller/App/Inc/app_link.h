@@ -3,8 +3,8 @@
   * @file    app_link.h
   * @brief   LegacyIoTask <-> ControlTask 사이의 얇은 seam.
   * @note    인터페이스에 FreeRTOS 타입이 나오지 않는다. 펌웨어에서는
-  *          App/Src/rtos_app.c가 static queue/notification으로 구현하고,
-  *          host 테스트는 같은 이름의 fake로 구현한다 — platform_stm32.h와 같은 규칙이다.
+  *          App/Src/rtos_app.c가 static queue/notification으로 구현한다. host
+  *          테스트는 같은 이름의 fake로 구현한다. platform_stm32.h와 같은 규칙이다.
   ******************************************************************************
   */
 #ifndef APP_LINK_H
@@ -17,17 +17,17 @@
 
 /**
   * @brief  명령 snapshot을 길이 1 mailbox에 게시하고 ControlTask를 깨운다.
-  * @note   overwrite다. 아직 소비되지 않은 이전 명령은 사라지며, 그 seq의 결과는
-  *         영영 오지 않는다 — 호출자는 seq 불일치를 err로 처리해야 한다.
+  * @note   overwrite다. 아직 소비되지 않은 이전 명령은 사라진다. 그 seq의 결과는 영영
+  *         오지 않는다. 호출자는 seq 불일치를 err로 처리해야 한다.
   * @retval 게시하지 못했으면 false.
   */
 bool app_link_post_command(const control_command_t *cmd);
 
 /**
-  * @brief  micro-ROS `/cmd_vel`이 만든 명령을 게시한다. **별도 mailbox다.**
+  * @brief  micro-ROS `/cmd_vel`이 만든 명령을 게시한다. 별도 mailbox다.
   * @note   레거시 ASCII 경로와 큐를 나눈 이유는 seq 충돌이다. 하나를 같이 쓰면
   *         micro-ROS가 게시한 명령의 결과를 LegacyIoTask가 자기 seq의 결과로
-  *         읽어 `ok`를 잘못 보낼 수 있다 — 게시 순서에 따라 조용히 갈리는 실패다.
+  *         읽어 `ok`를 잘못 보낼 수 있다. 게시 순서에 따라 조용히 갈리는 실패다.
   *         큐를 나누면 두 경로가 서로의 ACK를 오염시키지 못한다.
   *
   *         이쪽에는 결과 큐가 없다. `/cmd_vel`은 BEST_EFFORT이고 응답할 상대도
@@ -37,7 +37,7 @@ bool app_link_post_command(const control_command_t *cmd);
 bool app_link_post_cmd_vel(const control_command_t *cmd);
 
 /**
-  * @brief  해당 seq의 적용 결과를 **상한 있는 시간** 동안 기다린다.
+  * @brief  해당 seq의 적용 결과를 상한 있는 시간 동안 기다린다.
   * @retval 시간 안에 결과를 하나라도 받았으면 true (seq 일치 여부는 호출자가 본다).
   */
 bool app_link_wait_applied(uint32_t seq, uint32_t timeout_ms,

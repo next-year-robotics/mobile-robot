@@ -72,8 +72,8 @@ void u3_smoke_init(u3_smoke_t *s)
 
 /**
   * @brief  P 순번 하나를 계수기에 반영한다.
-  * @note   기대값보다 크면 **건너뛴 개수만큼** gap에 더한다. 작으면 중복/역전이며
-  *         기대값을 뒤로 되돌리지 않는다 — 되돌리면 그 뒤 정상 순번이 전부 중복으로
+  * @note   기대값보다 크면 건너뛴 개수만큼 gap에 더한다. 작으면 중복이나 역전이다.
+  *         기대값을 뒤로 되돌리지 않는다. 되돌리면 그 뒤 정상 순번이 전부 중복으로
   *         보인다.
   */
 static void account_seq(u3_smoke_t *s, uint32_t seq)
@@ -129,7 +129,7 @@ static u3_event_t parse_line(u3_smoke_t *s, const char *line, uint32_t *out_valu
       {
         return U3_EVENT_BAD;
       }
-      /* 자기 자신도 세지 않는다 — Z 이후가 그대로 0에서 시작해야 판정이 쉽다. */
+      /* 자기 자신도 세지 않는다. Z 이후가 그대로 0에서 시작해야 판정이 쉽다. */
       counters_reset(s);
       return U3_EVENT_RESET;
 

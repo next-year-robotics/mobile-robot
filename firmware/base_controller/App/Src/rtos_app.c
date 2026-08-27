@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file    rtos_app.c
   * @brief   static-allocation FreeRTOS 실행 뼈대.
-  * @note    **application이 소유하는 RTOS 객체는 전부 여기서 native FreeRTOS API로
-  *          만든다.** CMSIS-RTOS v2는 생성 코드가 부르는 osKernelInitialize/
+  * @note    application이 소유하는 RTOS 객체는 전부 여기서 native FreeRTOS API로
+  *          만든다. CMSIS-RTOS v2는 생성 코드가 부르는 osKernelInitialize/
   *          osKernelStart 접점에만 남는다. 같은 객체를 두 API로 번갈아 다루지 않는다.
   *
   *          동적 할당은 없다. configSUPPORT_DYNAMIC_ALLOCATION=0이며 heap_4.c는
@@ -55,7 +55,7 @@ volatile uint32_t g_iwdg_test_stall_control;
 /* static RTOS 객체                                                           */
 /* ------------------------------------------------------------------------- */
 
-/* 배열 길이는 StackType_t **word**다. CMSIS의 stack_size(byte)와 단위가 다르다. */
+/* 배열 길이는 StackType_t word다. CMSIS의 stack_size(byte)와 단위가 다르다. */
 static StackType_t  s_control_stack[TASK_STACK_WORDS_CONTROL];
 static StaticTask_t s_control_tcb;
 static StackType_t  s_health_stack[TASK_STACK_WORDS_HEALTH];
@@ -68,16 +68,16 @@ static TaskHandle_t s_health_task;
 static TaskHandle_t s_io_task;
 
 #if U3_SMOKE_TEST
-/* SmokeTask는 U3 전용이다. handle을 여기 두는 이유는 HealthTask의 stack 계측이
-   task 본체보다 앞에 있기 때문이다. */
+/* SmokeTask는 U3 전용이다. HealthTask의 stack 계측이 task 본체보다 앞에 있어
+   handle을 여기 둔다. */
 static StackType_t  s_smoke_stack[TASK_STACK_WORDS_SMOKE];
 static StaticTask_t s_smoke_tcb;
 static TaskHandle_t s_smoke_task;
 #endif
 
 #if MICRO_ROS
-/* MicroRosTask (P3). 본체는 micro_ros_app.c에 있고 여기서는 정적 메모리와
-   생성만 소유한다 — RTOS 객체를 만드는 자리를 이 파일 하나로 유지한다. */
+/* MicroRosTask (P3). 본체는 micro_ros_app.c에 있고 여기서는 정적 메모리와 생성만
+   소유한다. RTOS 객체를 만드는 자리를 이 파일 하나로 유지한다. */
 static StackType_t  s_micro_ros_stack[TASK_STACK_WORDS_MICRO_ROS];
 static StaticTask_t s_micro_ros_tcb;
 static TaskHandle_t s_micro_ros_task;
@@ -96,8 +96,8 @@ static uint8_t       s_status_storage[sizeof(control_status_t)];
 static StaticQueue_t s_status_queue_cb;
 static QueueHandle_t s_status_queue;
 
-/* micro-ROS `/cmd_vel` 전용 길이 1 mailbox. 레거시 명령 큐와 나눈 근거는
-   app_link.h의 app_link_post_cmd_vel() 주석에 있다. 이쪽에는 결과 큐가 없다. */
+/* micro-ROS `/cmd_vel` 전용 길이 1 mailbox. 레거시 명령 큐와 나눈 근거는 app_link.h에
+   있다. 이쪽에는 결과 큐가 없다. */
 static uint8_t       s_cmdvel_storage[sizeof(control_command_t)];
 static StaticQueue_t s_cmdvel_queue_cb;
 static QueueHandle_t s_cmdvel_queue;
@@ -185,8 +185,7 @@ bool app_link_post_command(const control_command_t *cmd)
     return false;
   }
 
-  /* 길이 1 overwrite다. 아직 소비되지 않은 이전 명령은 사라지고 그 seq의 결과는
-     오지 않는다 — 호출자가 seq 불일치를 err로 처리한다. */
+  /* 길이 1 overwrite다. 근거는 app_link.h에 있다. */
   if (xQueueOverwrite(s_cmd_queue, cmd) != pdPASS)
   {
     return false;
@@ -203,9 +202,8 @@ bool app_link_post_cmd_vel(const control_command_t *cmd)
     return false;
   }
 
-  /* overwrite다. 아직 소비되지 않은 이전 /cmd_vel은 사라진다 — KEEP_LAST(1)
-     BEST_EFFORT 계약과 같은 뜻이며, 큐에 쌓인 속도 지령은 이미 사용자의 의도가
-     아니다 (base_contract.md QoS 절). */
+  /* overwrite다. 큐에 쌓인 속도 지령은 이미 사용자의 의도가 아니므로 KEEP_LAST(1)
+     BEST_EFFORT 계약과 뜻이 같다. */
   if (xQueueOverwrite(s_cmdvel_queue, cmd) != pdPASS)
   {
     return false;
@@ -241,8 +239,8 @@ bool app_link_wait_applied(uint32_t seq, uint32_t timeout_ms,
       return true;
     }
 
-    /* 뒤처진 다른 seq의 결과다. 시간이 남았으면 계속 기다리고, 다 썼으면 그대로
-       돌려준다 — 호출자가 seq 불일치를 err로 판정한다. */
+    /* 뒤처진 다른 seq의 결과다. 시간이 남았으면 계속 기다리고 다 썼으면 그대로
+       돌려준다. 호출자가 seq 불일치를 err로 판정한다. */
     if (remaining == 0U)
     {
       return true;
@@ -305,7 +303,7 @@ void app_link_notify_io_from_isr(void)
 /* ------------------------------------------------------------------------- */
 
 /**
-  * @brief  **정상 운전에서 TIM1 출력을 건드리는 유일한 지점이다.**
+  * @brief  정상 운전에서 TIM1 출력을 건드리는 유일한 지점이다.
   */
 static void control_apply_output(const control_out_t *out)
 {
@@ -353,8 +351,8 @@ static void control_task(void *argument)
 {
   (void)argument;
 
-  /* 여기 도달했다는 것은 handle과 static 객체가 전부 준비됐다는 뜻이다. TIM6는
-     이 시점 이후에만 인터럽트를 올린다. */
+  /* 여기 도달했으면 handle과 static 객체가 전부 준비돼 있다. TIM6는 이 시점
+     이후에만 인터럽트를 올린다. */
   if (!platform_control_timer_start())
   {
     Error_Handler();
@@ -389,9 +387,9 @@ static void control_task(void *argument)
     entry_cycles = platform_dwt_cycles();
     now_ms = platform_now_ms();
 
-    /* 순서가 곧 안전 규칙이다. 명령을 먼저 반영하고, 같은 wake에 fault가 섞여
-       있으면 그 fault가 출력을 다시 0으로 덮는다. 결과의 정오는 LegacyIoTask가
-       RX fault epoch 재확인으로 가린다. */
+    /* 순서가 곧 안전 규칙이다. 명령을 먼저 반영한다. 같은 wake에 fault가 섞여
+       있으면 그 fault가 출력을 다시 0으로 덮는다. 결과의 정오는 LegacyIoTask가 RX
+       fault epoch 재확인으로 가린다. */
     if ((notify & CTRL_NOTIFY_COMMAND) != 0U)
     {
       control_command_t cmd;
@@ -410,7 +408,7 @@ static void control_task(void *argument)
     {
       control_command_t cmd;
 
-      /* **결과를 게시하지 않는다.** s_result_queue는 레거시 ACK 상관관계 전용이고,
+      /* 결과를 게시하지 않는다. s_result_queue는 레거시 ACK 상관관계 전용이다.
          여기에 /cmd_vel의 결과를 섞으면 LegacyIoTask가 남의 결과를 자기 seq로
          읽는다. /cmd_vel은 응답할 상대가 없으므로 결과를 버려도 잃는 것이 없다. */
       while (xQueueReceive(s_cmdvel_queue, &cmd, 0U) == pdTRUE)
@@ -639,7 +637,7 @@ static void legacy_io_task(void *argument)
   {
     uint32_t notify = 0U;
 
-    /* 개행 notification으로 깨어나고, timeout은 telemetry/워치독 통지/재무장을 위한
+    /* 개행 notification으로 깨어난다. timeout은 telemetry/워치독 통지/재무장을 위한
        그물이다. 어느 쪽이든 ControlTask보다 낮은 우선순위라 제어를 막을 수 없다. */
     (void)xTaskNotifyWait(0U, UINT32_MAX, &notify,
                           pdMS_TO_TICKS(LEGACY_IO_POLL_MS));
@@ -660,11 +658,11 @@ static uint8_t    s_smoke_rx[U3_SMOKE_READ_CHUNK];
 static uint32_t s_smoke_seq;
 static uint32_t s_smoke_build_fail;
 
-/* T 스트림 주기. 7절에서 호스트가 `N`으로 바꿔 링크 부하율을 올린다 — 50 Hz 기본값은
-   micro-ROS 실부하를 흉내 낼 뿐이라 고속 구간에서는 듀티가 너무 낮아 판정이 안 된다. */
+/* T 스트림 주기. 호스트가 `N`으로 바꿔 링크 부하율을 올린다. 50 Hz 기본값은 micro-ROS
+   실부하를 흉내 낼 뿐이라 고속 구간에서는 듀티가 너무 낮아 판정이 안 된다. */
 static uint32_t s_stream_period_ms;
 
-/* 보드레이트 전환 안전망(7절). 새 속도에서 유효한 줄을 하나라도 받으면 해제된다. */
+/* 보드레이트 전환 안전망. 새 속도에서 유효한 줄을 하나라도 받으면 해제된다. */
 static bool     s_baud_probation;
 static uint32_t s_baud_probation_ms;
 
@@ -676,7 +674,7 @@ static void smoke_send(const char *tag, const int64_t *values, size_t count)
   if (!line_build(s_smoke_tx, sizeof(s_smoke_tx), tag, values, count,
                   &offset, &length))
   {
-    /* 시험 경로다. 모터를 끊지 않는다 — 이 build에서도 제어 동작은 그대로여야 한다. */
+    /* 시험 경로다. 모터를 끊지 않는다. 이 build에서도 제어 동작은 그대로여야 한다. */
     s_smoke_build_fail++;
     return;
   }
@@ -685,9 +683,7 @@ static void smoke_send(const char *tag, const int64_t *values, size_t count)
 }
 
 /**
-  * @brief  50 Hz 상태 줄. **Pi -> MCU 방향의 판정값은 전부 여기 실린다.**
-  * @note   에코가 돌아오는 길에서 또 유실될 수 있으므로, 그 방향의 정직한 측정은
-  *         MCU 안의 계수기뿐이다. 호스트는 이 줄을 읽어 판정한다.
+  * @brief  50 Hz 상태 줄. Pi -> MCU 방향의 판정값은 전부 여기 실린다.
   */
 static void smoke_send_status(uint32_t now_ms)
 {
@@ -712,7 +708,7 @@ static void smoke_send_status(uint32_t now_ms)
   values[8] = (int64_t)link.rx_overflow_count;
   values[9] = (int64_t)link.rearm_count;
   values[10] = (int64_t)g_rtos_metrics.loop_overruns;
-  /* 6절 "CCR은 안전하게 0으로 수렴" 판정값. 0이면 좌우 duty가 모두 0이다. */
+  /* CCR이 0으로 수렴했는지 보는 값. 0이면 좌우 duty가 모두 0이다. */
   values[11] = (int64_t)(((duty_left < 0) ? -duty_left : duty_left) +
                          ((duty_right < 0) ? -duty_right : duty_right));
 
@@ -720,7 +716,7 @@ static void smoke_send_status(uint32_t now_ms)
 }
 
 /**
-  * @brief  보드레이트를 바꾼다. ACK는 **전환 전 속도로** 나가야 호스트가 받는다.
+  * @brief  보드레이트를 바꾼다. ACK는 전환 전 속도로 나가야 호스트가 받는다.
   */
 static void smoke_apply_baud(uint32_t baud)
 {
@@ -784,7 +780,7 @@ static void smoke_task(void *argument)
         continue;
       }
 
-      /* 형식이 맞는 줄이 하나라도 왔다면 이 속도에서 링크가 살아 있다는 뜻이다. */
+      /* 형식이 맞는 줄이 하나라도 왔다면 이 속도에서 링크가 살아 있다. */
       if (event != U3_EVENT_BAD)
       {
         s_baud_probation = false;
@@ -846,9 +842,9 @@ static void smoke_task(void *argument)
     else if ((uint32_t)(now_ms - last_stream_ms) >= s_stream_period_ms)
     {
       /* 따라가고 있는 동안은 누산으로 주기를 정확히 지킨다. 블로킹 송신이 주기보다
-         길어지는 저속·고부하 구간에서는 한 주기 넘게 밀리는데, 그때 밀린 몫을 몰아
+         길어지는 저속·고부하 구간에서는 한 주기 넘게 밀린다. 그때 밀린 몫을 몰아
          내보내면 버스트가 된다. 그런 경우에는 현재 시각으로 맞춰 실제 달성 주파수가
-         스스로 낮아지게 두고, 호스트가 그 값을 그대로 잰다. */
+         스스로 낮아지게 둔다. 호스트가 그 값을 그대로 잰다. */
       last_stream_ms += s_stream_period_ms;
       if ((uint32_t)(now_ms - last_stream_ms) >= s_stream_period_ms)
       {
@@ -948,7 +944,7 @@ void rtos_app_init(void)
 /* static 메모리 공급 (idle / timer)                                          */
 /* ------------------------------------------------------------------------- */
 
-/* cmsis_os2.c에 __WEAK 기본 구현이 있지만, 정적 메모리를 application이 명시적으로
+/* cmsis_os2.c에 __WEAK 기본 구현이 있지만 정적 메모리를 application이 명시적으로
    소유하도록 strong definition으로 덮는다. 길이 단위는 word다. */
 void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
                                    StackType_t **ppxIdleTaskStackBuffer,

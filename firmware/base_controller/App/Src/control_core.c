@@ -6,8 +6,8 @@
   *          지난 duty가 어딘가에 남아 있다가 되살아나는 경로 자체를 만들지 않는다.
   *
   *          두 모드가 나란히 있다.
-  *            개루프(duty) — 호스트가 준 per-mille를 클램프해 그대로 쓴다 (M3).
-  *            폐루프(vel)  — 목표 tps를 받아 FF+PI가 duty를 만든다 (M4).
+  *            개루프(duty) — 호스트가 준 per-mille를 클램프해 그대로 쓴다.
+  *            폐루프(vel)  — 목표 tps를 받아 FF+PI가 duty를 만든다.
   *          모드는 마지막 duty/vel 지령이 정하고, 모드가 바뀌면 적분기를 리셋한다.
   ******************************************************************************
   */
@@ -16,8 +16,8 @@
 #include "app_config.h"
 #include "motor_output.h"
 
-/* app_config.h의 확정값으로 초기화한다. const가 아닌 것은 M4-B 튜닝 중 SWD로
-   덮어쓰기 위해서다 — 확정된 값은 반드시 app_config.h로 되돌려 커밋한다. */
+/* app_config.h의 확정값으로 초기화한다. const가 아닌 것은 튜닝 중 SWD로 덮어쓰기
+   위해서다. 확정된 값은 반드시 app_config.h로 되돌려 커밋한다. */
 speed_gains_t g_speed_gains_left = {
   KFF_LEFT, RUN_INTERCEPT_LEFT, SPEED_KP_LEFT, SPEED_KI_CYCLE_LEFT,
   SPEED_I_MAX_PM, MOTOR_DUTY_MAX_PM
@@ -48,10 +48,10 @@ static int32_t round_to_i32(float value)
 
 /**
   * @brief  코스팅으로 되돌린다. 목표·적분기·지령 duty를 전부 지운다.
-  * @note   워치독 만료, stop, urgent stop이 전부 여기로 온다.
-  *         **"정지 = 자유 회전"이 이 단계의 유일한 정지 의미다.** 목표 0에서 PI를
-  *         돌리면 error = -measured가 되어 역방향 duty가 나오고, 그건 전류 측정
-  *         수단이 없는 상태에서 기어박스에 거는 역토크다 (M4.md 3.5).
+  * @note   워치독 만료, stop, urgent stop이 전부 여기로 온다. 이 펌웨어에서 정지는 곧
+  *         자유 회전이다. 목표 0에서 PI를 돌리면 error = -measured가 되어 역방향
+  *         duty가 나온다. 전류 측정 수단이 없는 상태에서 그건 기어박스에 거는
+  *         역토크다.
   */
 static void control_coast(control_core_t *c)
 {
@@ -78,7 +78,7 @@ static void control_run_closed_loop(control_core_t *c, bool advance_integrator)
 /**
   * @brief  워치독/fault를 반영해 이번 cycle의 출력을 정한다.
   * @note   만료 edge는 여기서 한 번만 wd_seq로 바뀐다. 관측자는 wd_seq 변화를 보고
-  *         `wd` 한 줄을 만든다 — ControlTask가 0을 반영한 뒤에 일어난다.
+  *         `wd` 한 줄을 만든다. ControlTask가 0을 반영한 뒤에 일어난다.
   */
 static void control_commit(control_core_t *c, uint32_t now_ms, control_out_t *out)
 {
@@ -103,7 +103,7 @@ static void control_commit(control_core_t *c, uint32_t now_ms, control_out_t *ou
   }
 
   /* 만료 상태에서는 목표도 적분기도 남기지 않는다. 출력이 다시 허용되는 유일한
-     경로는 새 유효 명령이며, 그때 목표가 새로 실린다. */
+     경로는 새 유효 명령이다. 그때 목표가 새로 실린다. */
   control_coast(c);
 
   if (motor_safety_faulted(&c->safety))
@@ -206,8 +206,8 @@ void control_core_on_command(control_core_t *c, uint32_t now_ms,
     return;
   }
 
-  /* 이미 기한을 넘겨 도착한 명령은 적용하지 않는다. 부호 있는 뺄셈으로 wrap-safe하게
-     비교한다 — 200 ms 지평에서 uint32 tick의 절반을 넘길 일이 없다. */
+  /* 이미 기한을 넘겨 도착한 명령은 적용하지 않는다. 부호 있는 뺄셈으로
+     wrap-safe하게 비교한다. 200 ms 지평에서 uint32 tick의 절반을 넘길 일이 없다. */
   if ((int32_t)(now_ms - cmd->deadline_ms) >= 0)
   {
     c->stale_command_count++;
@@ -219,7 +219,7 @@ void control_core_on_command(control_core_t *c, uint32_t now_ms,
   switch (cmd->kind)
   {
     case CONTROL_CMD_DUTY:
-      /* 개루프로 전환한다. 폐루프에서 쌓인 적분기를 남기지 않는다. */
+      /* 개루프로 전환한다. 폐루프에서 쌓인 적분기를 지운다. */
       c->closed_loop = false;
       control_coast(c);
       /* 실제 출력은 어차피 클램프된다. 호스트가 무엇이 적용됐는지 알 수 있도록
@@ -245,9 +245,9 @@ void control_core_on_command(control_core_t *c, uint32_t now_ms,
       speed_control_set_target(&c->spd_left, target_left);
       speed_control_set_target(&c->spd_right, target_right);
 
-      /* 새 FF + 새 P + **기존 I**로 즉시 다시 계산한다. 적분은 진행시키지 않는다 —
-         ok는 "이 seq의 결과가 CCR에 실렸다"는 뜻을 유지해야 하고, 진행되는 적분의
-         dT는 정확히 한 주기여야 한다. */
+      /* 새 FF + 새 P + 기존 I로 즉시 다시 계산한다. 적분은 진행시키지 않는다. ok는
+         "이 seq의 결과가 CCR에 실렸다"는 뜻을 유지해야 한다. 진행되는 적분의 dT는
+         정확히 한 주기여야 한다. */
       control_run_closed_loop(c, false);
       break;
     }

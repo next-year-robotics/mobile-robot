@@ -2,9 +2,9 @@
   ******************************************************************************
   * @file    speed_control.c
   * @brief   바퀴 하나의 FF + PI 구현.
-  * @note    상태는 적분기 하나뿐이다. 나머지는 매 호출 새로 계산한다 — 지난
-  *          출력이 어딘가에 남아 있다가 되살아나는 경로를 만들지 않는다는
-  *          control_core.c와 같은 원칙이다.
+  * @note    상태는 적분기 하나뿐이다. 나머지는 매 호출 새로 계산한다. 지난 출력이
+  *          어딘가에 남아 있다가 되살아나는 경로를 만들지 않는다. control_core.c와
+  *          같은 원칙이다.
   ******************************************************************************
   */
 #include "speed_control.h"
@@ -95,8 +95,8 @@ int32_t speed_control_update(speed_control_t *s, const speed_gains_t *g,
   float candidate;
   float duty_raw;
 
-  /* 목표 0은 코스팅이다. PI를 돌리면 error = -measured가 되어 역방향 duty가
-     나오고, 그건 전류 측정 수단이 없는 상태에서 거는 능동 제동이다. */
+  /* 목표 0은 코스팅이다. PI를 돌리면 error = -measured가 되어 역방향 duty가 나온다.
+     그건 전류 측정 수단이 없는 상태에서 거는 능동 제동이다. */
   if (s->target_tps == 0)
   {
     speed_control_reset(s);
@@ -113,7 +113,7 @@ int32_t speed_control_update(speed_control_t *s, const speed_gains_t *g,
 
     candidate = duty_ff + proportional + i_next;
 
-    /* 조건부 적분: 후보가 포화를 **더 밀어붙일 때만** 보류한다. error가 포화에서
+    /* 조건부 적분이다. 후보가 포화를 더 밀어붙일 때만 보류한다. error가 포화에서
        빠져나오는 방향이면 적분을 허용해야 복귀가 늦어지지 않는다. */
     if ((candidate > (float)g->duty_max_pm) && (error > 0.0f))
     {

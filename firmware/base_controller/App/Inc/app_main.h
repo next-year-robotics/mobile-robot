@@ -3,8 +3,8 @@
   * @file    app_main.h
   * @brief   LegacyIoTask의 orchestration. ASCII 수신/파싱/ACK/telemetry를 맡는다.
   * @note    이 파일은 TIM1/CCR/MOE를 직접 만지지 않는다. 모터 출력의 정상 경로
-  *          소유자는 ControlTask 하나뿐이며, 여기서는 app_link로 명령을 넘기고
-  *          **적용 결과를 받은 뒤에만** ACK한다.
+  *          소유자는 ControlTask 하나뿐이다. 여기서는 app_link로 명령을 넘기고 적용
+  *          결과를 받은 뒤에만 ACK한다.
   ******************************************************************************
   */
 #ifndef APP_MAIN_H
@@ -48,8 +48,8 @@ void app_get_io_metrics(app_io_metrics_t *out);
 
 /**
   * @brief  수신 바이트 하나.
-  * @note   링이 차면 ControlTask에 urgent STOP을 걸고 RX fault epoch를 올린다.
-  *         **CCR을 직접 쓰지 않는다.** 개행에서만 LegacyIoTask를 깨운다.
+  * @note   링이 차면 ControlTask에 urgent STOP을 걸고 RX fault epoch를 올린다. CCR을
+  *         직접 쓰지 않는다. LegacyIoTask는 개행에서만 깨운다.
   */
 void app_on_rx_byte(uint8_t byte);
 

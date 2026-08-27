@@ -3,15 +3,10 @@
   * @file    app_main.c
   * @brief   LegacyIoTask orchestration. ASCII 수신/파싱/ACK/telemetry만 맡는다.
   * @note    정책·파싱 계산은 전부 순수 모듈에 있다. 이 파일은 순서만 정한다.
-  *          레지스터는 platform_stm32 adapter를 통해서만 만지고, **TIM1/CCR/MOE는
-  *          여기서 건드리지 않는다.** 모터 출력의 정상 경로 소유자는 ControlTask다.
+  *          레지스터는 platform_stm32 adapter를 통해서만 만진다. TIM1/CCR/MOE는
+  *          여기서 건드리지 않는다. 모터 출력의 정상 경로 소유자는 ControlTask다.
   *
-  *          한 바퀴의 순서는 안전이 먼저다.
-  *            1. RX 손상 동기화 + ControlTask에 urgent STOP.
-  *            2. 수신이 풀려 있으면 다시 건다.
-  *            3. **상한이 있는** 명령 처리. ACK는 ControlTask의 적용 결과를 받은 뒤에만.
-  *            4. ControlTask가 게시한 워치독 만료 edge 통지.
-  *            5. 50 Hz 텔레메트리.
+  *          한 바퀴의 순서는 안전이 먼저다. 자세한 단계는 app_step()에 적어 두었다.
   ******************************************************************************
   */
 #include "app_main.h"
@@ -35,8 +30,8 @@ static char g_tx_buffer[TX_LINE_CAP];
 
 static uint32_t g_last_report_ms;
 
-/* `spd` 텔레메트리 스위치. **기본 꺼짐이다** — M3 회귀(`motor_sweep.py`)는 이 줄을
-   의도적으로 해석하지 않으므로, 실수로 기본 활성화하면 wire 회귀가 반드시 실패한다. */
+/* `spd` 텔레메트리 스위치. 기본은 꺼짐이다. 이 줄을 해석하지 않는 호스트 도구가 있으므로
+   기본으로 켜 두면 그쪽 파싱이 깨진다. */
 static bool g_spd_enabled;
 
 /* ControlTask status에서 관측한 워치독 만료 edge. 변화가 보일 때만 `wd` 한 줄이 나간다. */
@@ -82,8 +77,8 @@ void app_on_rx_byte(uint8_t byte)
     return;
   }
 
-  /* 프레임 경계에서만 깨운다. 230400 8N1에서 바이트마다 깨우면 notification이
-     초당 2만 번을 넘고, 그만큼은 전부 ISR/문맥전환 오버헤드가 된다. */
+  /* 프레임 경계에서만 깨운다. 230400 8N1에서 바이트마다 깨우면 notification이 초당
+     2만 번을 넘는다. 그만큼은 전부 ISR/문맥전환 오버헤드가 된다. */
   if (byte == (uint8_t)'\n')
   {
     app_link_notify_io_from_isr();
@@ -93,7 +88,7 @@ void app_on_rx_byte(uint8_t byte)
 void app_on_uart_error(uint32_t error_code)
 {
   /* HAL의 ORE 복구/재무장 경계에서는 ErrorCode가 이미 clear된 callback이 뒤따를 수
-     있다. 0으로 마지막 유효 FE/NE/ORE 진단값을 덮어쓰지 않는다. */
+     있다. 마지막 유효 FE/NE/ORE 진단값을 0으로 덮어쓰지 않는다. */
   if (error_code != 0U)
   {
     g_uart_error_last = error_code;
@@ -115,10 +110,10 @@ void app_on_rx_rearm_failed(void)
 
 /**
   * @brief  한 줄을 조립해 내보낸다. 실패는 계측하고 안전 상태로 넘어간다.
-  * @note   빌더가 capacity를 실제로 검사하므로 넘치는 줄은 송신되지 않는다.
-  *         송신 실패는 치명 경로다. platform_motor_kill()은 RTOS와 무관하게 즉시
-  *         부를 수 있는 유일한 예외이며, 그 뒤 ControlTask에도 fault를 래치시켜
-  *         이후 명령이 `ok`가 아니라 `err`가 되게 한다.
+  * @note   빌더가 capacity를 실제로 검사하므로 넘치는 줄은 송신되지 않는다. 송신
+  *         실패는 치명 경로다. platform_motor_kill()은 RTOS와 무관하게 즉시 부를 수
+  *         있는 유일한 예외다. 그 뒤 ControlTask에도 fault를 래치시켜 이후 명령을
+  *         `err`로 만든다.
   */
 static void send_line(const char *tag, const int64_t *values, size_t count)
 {
@@ -184,7 +179,7 @@ static bool sync_rx_faults(void)
 
   protocol_poison(&g_proto);
 
-  /* ISR이 이미 걸었지만 여기서 한 번 더 확정한다. 멱등이며, task 문맥에서 뒤늦게
+  /* ISR이 이미 걸었지만 여기서 한 번 더 확정한다. 멱등이다. task 문맥에서 뒤늦게
      발견한 epoch에도 정지가 반드시 따라붙게 한다. */
   app_link_urgent_stop(MOTOR_FAULT_NONE);
   return true;
@@ -230,10 +225,10 @@ static control_cmd_kind_t control_kind_of(proto_cmd_kind_t kind)
 }
 
 /**
-  * @brief  수락된 명령을 ControlTask에 넘기고 **적용 결과를 받은 뒤에만** ACK한다.
+  * @brief  수락된 명령을 ControlTask에 넘기고 적용 결과를 받은 뒤에만 ACK한다.
   * @note   `ok`는 "queue에 넣었다"가 아니라 "이 sequence의 값이 CCR에 반영됐다"는
-  *         뜻이다. 그래서 stop도 출력이 0이 된 뒤에 ACK된다.
-  *         `spd`만 예외다 — ControlTask로 가지 않는 설정 명령이라 여기서 끝난다.
+  *         뜻이다. 그래서 stop도 출력이 0이 된 뒤에 ACK된다. `spd`만 예외다.
+  *         ControlTask로 가지 않는 설정 명령이라 여기서 끝난다.
   */
 static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
 {
@@ -265,10 +260,10 @@ static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
 
   if (cmd->kind == PROTO_CMD_SPD)
   {
-    /* 설정 명령이다. **워치독을 먹이지 않는다** — 설정을 반복해서 모터를 계속
-       살려두는 경로를 만들지 않는다. ControlTask의 mailbox에도 들어가지 않으므로
-       command sequence도 소비하지 않는다.
-       ACK 형식은 그대로 두고 상태값 하나를 두 번 싣는다. */
+    /* 설정 명령이다. 워치독을 먹이지 않는다. 설정을 반복해서 모터를 계속 살려두는
+       경로를 막기 위해서다. ControlTask의 mailbox에도 들어가지 않으므로 command
+       sequence도 소비하지 않는다. ACK 형식은 그대로 두고 상태값 하나를 두 번
+       싣는다. */
     g_spd_enabled = (cmd->left != 0);
     values[0] = (int64_t)now_ms;
     values[1] = (int64_t)cmd->left;
@@ -320,9 +315,9 @@ static void command_accept(const proto_command_t *cmd, uint32_t now_ms)
 
 /**
   * @brief  수신 링을 소비하며 줄이 완성될 때마다 해석한다.
-  * @note   바이트 수와 줄 수에 **명시적 상한**이 있다. 호스트가 짧은 오류 줄을
-  *         최고속으로 퍼부어도 이 함수가 telemetry나 워치독 통지를 굶길 수 없고,
-  *         낮은 우선순위라 100 Hz ControlTask를 지연시킬 수도 없다.
+  * @note   바이트 수와 줄 수에 명시적 상한이 있다. 호스트가 짧은 오류 줄을 최고속으로
+  *         퍼부어도 이 함수가 telemetry나 워치독 통지를 굶길 수 없다. 낮은 우선순위라
+  *         100 Hz ControlTask를 지연시킬 수도 없다.
   */
 static void command_poll(uint32_t now_ms)
 {
@@ -445,9 +440,9 @@ void app_step(void)
     values[2] = status.ticks_right;
     send_line("ticks", values, 3U);
 
-    /* 튜닝용 스트림. 목표와 포화 플래그는 넣지 않는다 — 목표는 ok가 이미
-       알려줬고, 적분기와 포화는 SWD로 g_rtos_metrics에서 본다. 값을 늘리면
-       최악 줄이 TX_LINE_CAP을 넘어 UART_TX_TIMEOUT_MS 여유까지 다시 잡아야 한다. */
+    /* 튜닝용 스트림. 목표와 포화 플래그는 넣지 않는다. 목표는 ok가 이미 알려줬다.
+       적분기와 포화는 SWD로 g_rtos_metrics에서 본다. 값을 늘리면 최악 줄이
+       TX_LINE_CAP을 넘어 UART_TX_TIMEOUT_MS 여유까지 다시 잡아야 한다. */
     if (g_spd_enabled)
     {
       values[1] = (int64_t)status.measured_tps_left;
