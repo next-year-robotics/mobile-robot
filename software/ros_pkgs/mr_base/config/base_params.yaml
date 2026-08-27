@@ -5,7 +5,8 @@ mr_base:
   ros__parameters:
     wheel_radius_m: 0.04979        # M6 직선 2 m x 2회 실측 보정 (2026-08-23, 9.8 kg 적재)
                                    # 공칭 0.050에서 -0.42 %. MCU는 공칭 0.050 그대로다
-    wheel_separation_m: 0.264      # 줄자 실측 2026-08-22 (트레드 중심 간). M6 360°x4로 보정
+    wheel_separation_m: 0.30912    # M6 CCW 지면 1회전 x 2 실측 보정 (2026-08-27, 9.8 kg)
+                                   # 기하 공칭 0.264는 MCU /cmd_vel 변환에 그대로 남는다
     odom_frame_id: odom
     base_frame_id: base_footprint
     left_wheel_joint: left_wheel_joint
