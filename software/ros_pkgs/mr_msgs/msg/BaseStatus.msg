@@ -1,8 +1,7 @@
 # 베이스 상태. 10 Hz, BEST_EFFORT, KEEP_LAST(1).
 #
-# 이 파일이 아니라 0_tmp/adocs/interface/base_contract.md 3절이 원본이다.
-# 필드를 늘리려면 문서를 먼저 고치고, firmware/base_controller/micro_ros/
-# build_libmicroros.sh 로 libmicroros.a를 다시 뽑아야 한다.
+# 필드를 늘리면 firmware/base_controller/micro_ros/build_libmicroros.sh 로
+# libmicroros.a를 다시 뽑아야 펌웨어가 같은 정의를 쓴다.
 
 std_msgs/Header header
 

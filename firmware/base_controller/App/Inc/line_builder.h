@@ -22,7 +22,7 @@
   * @param  out_offset  성공 시 줄의 시작 인덱스
   * @param  out_length  성공 시 줄의 길이 ('\n' 포함)
   * @retval 공간이 모자라거나 인자가 잘못되면 false. 실패 시 buf 내용은 쓰레기이며
-  *         out_offset/out_length는 갱신되지 않는다 — 호출자는 송신하면 안 된다.
+  *         out_offset/out_length는 갱신되지 않는다. 호출자는 송신하면 안 된다.
   */
 bool line_build(char *buf, size_t capacity, const char *tag,
                 const int64_t *values, size_t count,

@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file    protocol_ascii.h
   * @brief   byte -> frame -> command. discard/resync 상태기계를 포함한다.
-  * @note    HAL/RTOS 비의존. M3 ASCII 규약을 그대로 구현한다.
+  * @note    HAL/RTOS 비의존. 계약이 정한 ASCII 규약을 그대로 구현한다.
   *
   *            호스트 -> MCU   duty <left_pm> <right_pm>\n   (-1000 ~ +1000)
   *                            stop\n

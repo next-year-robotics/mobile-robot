@@ -28,17 +28,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# 실제 보드 IWDG reset HIL 전용. ON build에서만 SWD로 ControlTask stall을 주입할
-# 수 있으며, 기본 firmware에는 fault-injection 분기가 컴파일되지 않는다.
+# 실제 보드 IWDG reset HIL 전용. ON build에서만 SWD로 ControlTask stall을 주입할 수
+# 있다. 기본 firmware에는 fault-injection 분기가 컴파일되지 않는다.
 option(IWDG_STALL_TEST "Enable the SWD-triggered ControlTask stall hook" OFF)
 
 # U3 양방향 smoke test / 보드레이트 스윕 전용. ON build에서만 SmokeTask와 u3_smoke.c가
-# 들어가며, 기본 firmware는 USART1로 한 바이트도 내보내지 않는다.
+# 들어간다. 기본 firmware는 USART1로 한 바이트도 내보내지 않는다.
 option(U3_SMOKE_TEST "Enable the USART1 U3 smoke-test task" OFF)
 
-# micro-ROS (M5 8절). production image의 기본값이 ON인 이유는 M5부터 이것이
-# 로봇의 주 통신 경로이기 때문이다. U3-Smoke preset만 OFF로 덮는다 — 둘 다
-# USART1의 소유자를 자처하므로 app_config.h의 _Static_assert가 동시 사용을 막는다.
+# micro-ROS. production image의 기본값이 ON인 이유는 이것이 로봇의 주 통신 경로이기
+# 때문이다. U3-Smoke preset만 OFF로 덮는다. 둘 다 USART1의 소유자를 자처하므로
+# app_config.h의 _Static_assert가 동시 사용을 막는다.
 option(MICRO_ROS "Link libmicroros.a and run MicroRosTask" ON)
 
 set(MICRO_ROS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/micro_ros/libmicroros)
@@ -97,7 +97,7 @@ if(MICRO_ROS)
     )
 endif()
 
-# U3 smoke test의 순수 모듈. 시험 build에서만 링크한다 — production image에 죽은
+# U3 smoke test의 순수 모듈. 시험 build에서만 링크한다. production image에 죽은
 # 코드를 남기지 않는다.
 if(U3_SMOKE_TEST)
     target_sources(${CMAKE_PROJECT_NAME} PRIVATE
@@ -107,10 +107,10 @@ endif()
 
 # static-allocation 전용: FreeRTOS heap을 링크 대상에서 뺀다.
 #
-# 생성 파일 cmake/stm32cubemx/CMakeLists.txt의 FreeRTOS_Src에는 heap_4.c가 들어
-# 있고 재생성 때마다 다시 들어온다. 그래서 그 파일을 고치는 대신 여기(사용자 영역)
-# 에서 걸러 낸다. heap_4.c 자체가 configSUPPORT_DYNAMIC_ALLOCATION==0이면 #error로
-# 빌드를 세우므로, 이 필터가 빠지면 조용히 넘어가지 않고 즉시 드러난다.
+# 생성 파일 cmake/stm32cubemx/CMakeLists.txt의 FreeRTOS_Src에는 heap_4.c가 들어 있고
+# 재생성 때마다 다시 들어온다. 그래서 그 파일을 고치는 대신 여기 사용자 영역에서 걸러
+# 낸다. heap_4.c 자체가 configSUPPORT_DYNAMIC_ALLOCATION==0이면 #error로 빌드를
+# 세우므로 이 필터가 빠지면 조용히 넘어가지 않고 즉시 드러난다.
 get_target_property(FREERTOS_SOURCES FreeRTOS SOURCES)
 list(FILTER FREERTOS_SOURCES EXCLUDE REGEX "portable/MemMang/heap_[0-9]+\\.c$")
 set_target_properties(FreeRTOS PROPERTIES SOURCES "${FREERTOS_SOURCES}")
@@ -200,6 +200,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
 if(MICRO_ROS)
     # 절대 경로로 건다. -L/-l 조합은 검색 경로에 있는 다른 libmicroros를 집어 갈 수
-    # 있고, ABI가 다른 라이브러리를 링크하면 실패가 런타임까지 내려간다.
+    # 있다. ABI가 다른 라이브러리를 링크하면 실패가 런타임까지 내려간다.
     target_link_libraries(${CMAKE_PROJECT_NAME} ${MICRO_ROS_DIR}/libmicroros.a)
 endif()

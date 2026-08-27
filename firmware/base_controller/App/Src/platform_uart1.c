@@ -11,19 +11,19 @@
 #include "main.h"
 #include "usart.h"
 
-/* DMA 링 크기. 2의 거듭제곱이어야 인덱스를 & 로 감을 수 있다.
-   소비자가 U3_SMOKE_POLL_MS마다 긁어 가므로, 이 크기는 "한 주기 동안 들어올 수 있는
-   최대 바이트"보다 넉넉해야 한다. 2048 B는 3 Mbaud에서도 6.8 ms 분량이라 1 ms 주기에
-   6배 이상 여유가 있다. */
+/* DMA 링 크기. 2의 거듭제곱이어야 인덱스를 & 로 감을 수 있다. 소비자가
+   U3_SMOKE_POLL_MS마다 긁어 가므로 이 크기는 "한 주기 동안 들어올 수 있는 최대
+   바이트"보다 넉넉해야 한다. 2048 B는 3 Mbaud에서도 6.8 ms 분량이라 1 ms 주기에 6배
+   이상 여유가 있다. */
 #define UART1_RX_DMA_SIZE       2048U
 
-/* 고수위. 링이 이만큼 차 있는 것을 관측하면 유실이 임박한 것으로 본다. circular DMA는
-   생산자가 소비자를 앞질러도 아무 신호를 남기지 않으므로, 넘친 뒤가 아니라 **넘치기
-   전에** 세는 것이 유일하게 정직한 관측이다. */
+/* 고수위. 링이 이만큼 차 있는 것을 관측하면 유실이 임박한 것으로 본다. circular
+   DMA는 생산자가 소비자를 앞질러도 아무 신호를 남기지 않으므로 넘친 뒤가 아니라
+   넘치기 전에 세는 것이 유일하게 정직한 관측이다. */
 #define UART1_RX_HIGH_WATER     (UART1_RX_DMA_SIZE - (UART1_RX_DMA_SIZE / 8U))
 
 /* 최악의 T 줄은 134 B다. 230400 8N1에서 약 5.8 ms이므로 20 ms면 충분한 상한이다.
-   여기서 걸리면 링크가 아니라 주변장치가 죽은 것이다. */
+   여기서 걸리면 링크가 아니라 주변장치가 죽었다. */
 #define UART1_TX_TIMEOUT_MS       20U
 
 _Static_assert((UART1_RX_DMA_SIZE & (UART1_RX_DMA_SIZE - 1U)) == 0U,
@@ -82,8 +82,8 @@ bool platform_uart1_start(void)
   s_metrics.baud = huart1.Init.BaudRate;
   armed = rx_arm();
 
-  /* 처음 거는 것은 "복구"가 아니다. 무장한 **뒤에** 0으로 두어야 rearm_count가
-     "링크가 죽어서 되살린 횟수"라는 뜻을 갖는다. */
+  /* 처음 거는 것은 복구가 아니다. 무장한 뒤에 0으로 두어야 rearm_count가 "링크가
+     죽어서 되살린 횟수"라는 뜻을 갖는다. */
   platform_uart1_reset_metrics();
   return armed;
 }
@@ -207,6 +207,6 @@ void platform_uart1_on_error_isr(uint32_t error_code)
   }
 
   /* 재무장은 여기서 하지 않는다. HAL은 blocking error에서 HAL_DMA_Abort_IT를 걸고
-     그 완료 callback에서 여기로 오기도 하므로, 이 시점의 상태를 믿고 다시 걸면
-     조용히 실패한다. 소유 task가 platform_uart1_rearm_if_needed()로 받는다. */
+     그 완료 callback에서 여기로 오기도 한다. 이 시점의 상태를 믿고 다시 걸면 조용히
+     실패한다. 소유 task가 platform_uart1_rearm_if_needed()로 받는다. */
 }

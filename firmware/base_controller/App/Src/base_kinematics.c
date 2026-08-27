@@ -71,8 +71,8 @@ bool base_kin_twist_to_tps(const base_geometry_t *g,
   right = (linear_x_mps + (angular_z_radps * half_track)) * mps_to_tps;
 
   /* 큰 twist가 들어오면 곱셈 결과가 int32 범위를 넘을 수 있다. 아래 비례 축소가
-     그것도 함께 잡지만, Inf가 아닌 거대한 유한값에서 peak/limit 나눗셈이
-     의미를 갖도록 순서를 이렇게 둔다. */
+     그것도 함께 잡는다. Inf가 아닌 거대한 유한값에서도 peak/limit 나눗셈이 의미를
+     갖도록 순서를 이렇게 둔다. */
   peak = fabsf(left);
   if (fabsf(right) > peak)
   {
@@ -82,7 +82,7 @@ bool base_kin_twist_to_tps(const base_geometry_t *g,
   limit = (float)g->max_tps;
   if (peak > limit)
   {
-    /* **좌우를 같은 비율로 줄인다.** 바퀴마다 따로 자르면 회전 반경이 바뀐다. */
+    /* 좌우를 같은 비율로 줄인다. 바퀴마다 따로 자르면 회전 반경이 바뀐다. */
     float scale = limit / peak;
 
     left *= scale;

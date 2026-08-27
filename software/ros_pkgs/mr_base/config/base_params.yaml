@@ -1,12 +1,12 @@
-# M6 오도메트리 노드 파라미터. 값의 원본은 interface/base_contract.md "물리 상수"다.
-# 남은 파라미터가 순수 기하학뿐인 것이 "오도메트리는 호스트, 제어는 MCU" 분리의 증거다.
-# ticks_per_rev, 좌우 tick sign, 제어 주기, 게인, 시리얼 포트는 여기 없다 — 전부 MCU다.
+# 오도메트리 노드 파라미터. 남은 것이 순수 기하학뿐인 것이 "오도메트리는 호스트,
+# 제어는 MCU" 분리의 증거다. ticks_per_rev, 좌우 tick sign, 제어 주기, 게인, 시리얼
+# 포트는 여기 없다. 전부 MCU 쪽이다.
 mr_base:
   ros__parameters:
-    wheel_radius_m: 0.04979        # M6 직선 2 m x 2회 실측 보정 (2026-08-23, 9.8 kg 적재)
-                                   # 공칭 0.050에서 -0.42 %. MCU는 공칭 0.050 그대로다
-    wheel_separation_m: 0.30912    # M6 CCW 지면 1회전 x 2 실측 보정 (2026-08-27, 9.8 kg)
-                                   # 기하 공칭 0.264는 MCU /cmd_vel 변환에 그대로 남는다
+    # 두 값 모두 지면 주행으로 보정한 유효값이다. MCU는 기하 공칭값(0.050 / 0.264)을
+    # 그대로 쓰므로 여기와 갈리는 것이 정상이다.
+    wheel_radius_m: 0.04979
+    wheel_separation_m: 0.30912
     odom_frame_id: odom
     base_frame_id: base_footprint
     left_wheel_joint: left_wheel_joint
@@ -15,6 +15,6 @@ mr_base:
 
     # wheel-only 오도메트리가 관측하지 못하는 자유도(z, roll, pitch)와 횡슬립을
     # 0 공분산으로 숨기지 않는다. 관측하는 x/y/yaw도 완전하지 않으므로 유한한 값을 준다.
-    # 시작값이고, U4 IMU + robot_localization EKF를 붙일 때 다시 맞춘다.
+    # 시작값이며, IMU와 EKF를 붙일 때 다시 맞춘다.
     pose_covariance_diagonal:  [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 0.01]
     twist_covariance_diagonal: [0.001, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 0.01]

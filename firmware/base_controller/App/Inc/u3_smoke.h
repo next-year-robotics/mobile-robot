@@ -2,21 +2,21 @@
   ******************************************************************************
   * @file    u3_smoke.h
   * @brief   U3 양방향 smoke test의 줄 규약과 계수기. HAL/RTOS 비의존 순수 모듈.
-  * @note    micro-ROS를 얹기 전에 USART1 링크 자체를 검증하기 위한 것이다
-  *          (`bringup/M5.md` 6절). 제어·IWDG 경로는 건드리지 않는다.
+  * @note    micro-ROS를 얹기 전에 USART1 링크 자체를 검증한다. 제어·IWDG 경로는
+  *          건드리지 않는다.
   *
   *            호스트 -> MCU   P <seq>\n      순번 있는 ping. seq는 uint32
   *                            S <mask>\n     bit0 = T 스트림, bit1 = R 에코
   *                            Z\n            수신 계수기와 순번 기준선 초기화
-  *                            B <baud>\n     USART1 보드레이트 전환 (7절 스윕용)
-  *                            N <ms>\n       T 스트림 주기 = 부하 조절 (7절 스윕용)
+  *                            B <baud>\n     USART1 보드레이트 전환 (스윕용)
+  *                            N <ms>\n       T 스트림 주기 = 부하 조절 (스윕용)
   *
   *            MCU -> 호스트   T <12개 값>\n  50 Hz 상태 스트림
   *                            R <seq>\n      P에 대한 같은 순번 에코
-  *                            B <baud>\n     보드레이트 전환 ACK (전환 **전** 속도로)
+  *                            B <baud>\n     보드레이트 전환 ACK (전환 전 속도로)
   *
-  *          누락·중복 판정은 MCU가 한다. 에코가 돌아오는 경로에서 또 유실될 수
-  *          있으므로 "Pi -> MCU 방향"의 정직한 측정값은 MCU 안의 계수기뿐이다.
+  *          누락·중복 판정은 MCU가 한다. 에코가 돌아오는 경로에서 또 유실될 수 있으므로
+  *          Pi -> MCU 방향의 정직한 측정값은 MCU 안의 계수기뿐이다.
   ******************************************************************************
   */
 #ifndef U3_SMOKE_H
@@ -61,7 +61,7 @@ typedef struct
 {
   uint32_t rx_ping;    /* 유효한 P 줄 수 */
   uint32_t rx_bad;     /* 형식이 깨진 줄 수 (= 문자 깨짐의 관측값) */
-  uint32_t rx_gap;     /* 건너뛴 순번의 **개수 합** */
+  uint32_t rx_gap;     /* 건너뛴 순번의 개수 합 */
   uint32_t rx_dup;     /* 순번이 되돌아온 줄 수 (중복/역전) */
 } u3_counters_t;
 
@@ -76,7 +76,7 @@ typedef struct
   u3_counters_t counters;
 } u3_smoke_t;
 
-/** @brief mode를 U3_MODE_ALL로 두고 시작한다 — 꽂자마자 T가 나와야 관측이 쉽다. */
+/** @brief mode를 U3_MODE_ALL로 두고 시작한다. 꽂자마자 T가 나와야 관측이 쉽다. */
 void u3_smoke_init(u3_smoke_t *s);
 
 /**

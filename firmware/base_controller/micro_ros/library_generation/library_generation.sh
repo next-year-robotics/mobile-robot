@@ -1,15 +1,15 @@
 #!/bin/bash
-# 컨테이너 **안에서** 도는 부분. host에서는 ../build_libmicroros.sh를 부른다.
+# 컨테이너 안에서 도는 부분. host에서는 ../build_libmicroros.sh를 부른다.
 #
-# 상위 흐름(micro_ros_stm32cubemx_utils의 library_generation.sh)과 다른 점 세 가지:
+# 상위 흐름(micro_ros_stm32cubemx_utils의 library_generation.sh)과 다른 점이 셋 있다.
 #
-#  1. **CFLAGS를 .mk에서 추출하지 않는다.** 그 방식은 STM32CubeIDE의 Makefile
-#     프로젝트를 전제한다. 이 프로젝트는 CMake + Ninja라 .mk가 없다. 대신
+#  1. CFLAGS를 .mk에서 추출하지 않는다. 그 방식은 STM32CubeIDE의 Makefile 프로젝트를
+#     전제한다. 이 프로젝트는 CMake + Ninja라 .mk가 없다. 대신
 #     library_generation/toolchain.cmake에 flag를 직접 적고, host 스크립트가
 #     애플리케이션 toolchain 파일과 ABI flag를 대조한다.
-#  2. **tf2_msgs와 control_msgs를 받지 않는다.** base_contract.md의 세 토픽이
-#     쓰는 타입은 sensor_msgs / geometry_msgs / std_msgs / builtin_interfaces뿐이고,
-#     이 넷은 generate_lib 기본 mcu_ws에 이미 들어 있다.
+#  2. tf2_msgs와 control_msgs를 받지 않는다. 계약이 정한 세 토픽이 쓰는 타입은
+#     sensor_msgs / geometry_msgs / std_msgs / builtin_interfaces뿐이고, 이 넷은
+#     generate_lib 기본 mcu_ws에 이미 들어 있다.
 #  3. 산출물 소유권을 host 사용자에게 되돌린다(chmod 777이 아니라 chown).
 set -e
 
@@ -34,7 +34,7 @@ source install/local_setup.bash
 
 ros2 run micro_ros_setup create_firmware_ws.sh generate_lib
 
-######## 사용자 정의 메시지 (M5.md 8.3 — mr_msgs) ########
+######## 사용자 정의 메시지 (mr_msgs) ########
 # extra_packages/ 가 비어 있으면 아무 일도 하지 않는다. 1차(표준 타입만) 단계는
 # 이 경로를 타지 않는다.
 if [ -n "$(ls -A $BASE_PATH/library_generation/extra_packages 2>/dev/null)" ]; then
@@ -46,7 +46,7 @@ fi
 
 ######## colcon.meta 반영 확인 (사전) ########
 # "names" 아래에 객체가 아닌 값을 두면 colcon이 매핑 전체를 조용히 버린다.
-# 그러면 transport가 기본값 udp로 돌아가 rmw_microxrcedds가 깨진다 — 2026-08-22 실측.
+# 그러면 transport가 기본값 udp로 돌아가 rmw_microxrcedds가 깨진다.
 python3 - "$BASE_PATH/library_generation/colcon.meta" <<'PYEOF'
 import json, sys
 meta = json.load(open(sys.argv[1]))

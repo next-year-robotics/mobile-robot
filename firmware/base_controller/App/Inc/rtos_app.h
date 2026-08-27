@@ -6,9 +6,9 @@
   *          FreeRTOS 타입이 나오지 않으므로 생성된 Core/ 코드에서 그대로 부를 수 있다.
   *
   *          task/IRQ/데이터 소유권
-  *            - ControlTask  P5 : TIM6 tick, 엔코더 샘플, 워치독, **TIM1 출력**
+  *            - ControlTask  P5 : TIM6 tick, 엔코더 샘플, 워치독, TIM1 출력
   *            - HealthTask   P4 : heartbeat/stack/fault 관측, LED
-  *            - MicroRosTask P3 : **USART1**, micro-ROS 세션/pub/sub/재접속 (M5)
+  *            - MicroRosTask P3 : USART1, micro-ROS 세션/pub/sub/재접속
   *            - LegacyIoTask P2 : USART2 RX/TX, ASCII 파싱, ACK, 50 Hz telemetry
   ******************************************************************************
   */
@@ -47,7 +47,7 @@ typedef struct
   uint32_t cmd_seq_mismatch_count;
   uint32_t cmd_rejected_count;
 
-  /* stack high-water mark. 단위는 **word**이며 남은 여유를 뜻한다. */
+  /* stack high-water mark. 단위는 word이며 남은 여유를 뜻한다. */
   uint32_t stack_free_control_words;
   uint32_t stack_free_health_words;
   uint32_t stack_free_io_words;
@@ -69,8 +69,8 @@ typedef struct
   uint32_t iwdg_test_mode;
   uint32_t iwdg_test_stall_seen;
 
-  /* ---- 속도 폐루프 계측 (M4) ----
-     "계측은 와이어가 아니라 SWD로"가 뼈대 단계에서 세운 원칙이다. 목표/적분기/
+  /* ---- 속도 폐루프 계측 ----
+     계측은 와이어가 아니라 SWD로 본다는 것이 이 프로젝트의 원칙이다. 목표/적분기/
      포화는 여기서만 본다. 전부 정수이며 적분기는 ‰ x 1000으로 싣는다. */
   uint32_t closed_loop;               /* 현재 모드 (0 개루프 / 1 폐루프) */
   uint32_t last_feed_ms;              /* 마지막으로 워치독을 먹인 시각 */
@@ -85,9 +85,9 @@ typedef struct
   uint32_t saturated_left;            /* 클램프 전 duty가 범위를 벗어났는가 */
   uint32_t saturated_right;
 
-  /* ---- micro-ROS 계측 (M5) ----
+  /* ---- micro-ROS 계측 ----
      micro_ros_app.c가 만든 snapshot을 HealthTask가 옮겨 온다. MICRO_ROS build가
-     아니면 전부 0으로 남는다 — 필드 자체는 남겨 SWD 스크립트를 갈라 쓰지 않는다. */
+     아니면 전부 0으로 남는다. 필드 자체를 남겨 두어야 SWD 스크립트를 갈라 쓰지 않는다. */
   uint32_t mr_agent_state;            /* agent_state_t. 2 = CONNECTED */
   uint32_t mr_connect_count;
   uint32_t mr_disconnect_count;
@@ -108,8 +108,7 @@ typedef struct
   uint32_t mr_base_status_count;
   uint32_t mr_base_status_fail_count;
 
-  /* micro-ROS 전용 pool. `free_min`이 안정화되고 `alloc_fail`이 0이면
-     M5.md 10절의 heap 항목이 통과다. */
+  /* micro-ROS 전용 pool. `free_min`이 안정화되고 `alloc_fail`이 0이면 누수가 없다. */
   uint32_t mr_pool_capacity;
   uint32_t mr_pool_free;
   uint32_t mr_pool_free_min;
@@ -119,7 +118,7 @@ typedef struct
   uint32_t mr_pool_live_blocks;
   uint32_t mr_pool_escaped_alloc;    /* libc malloc 우회 횟수. 0이어야 한다 */
 
-  /* USART1 링크. M5.md 6.6절의 "모터 구동 중 링크" 미검증 항목을 여기서 닫는다. */
+  /* USART1 링크. 모터가 돌고 있을 때 링크가 버티는지를 여기서 본다. */
   uint32_t mr_uart1_error_count;
   uint32_t mr_uart1_error_last;
   uint32_t mr_uart1_rx_overflow_count;
@@ -143,7 +142,7 @@ extern volatile uint32_t g_iwdg_test_stall_control;
 
 /**
   * @brief  static task와 mailbox를 만든다. MX_FREERTOS_Init()에서 부른다.
-  * @note   scheduler가 서기 전이며, 이 함수가 끝난 뒤에야 인터럽트 원이 켜진다.
+  * @note   scheduler가 서기 전이다. 이 함수가 끝난 뒤에야 인터럽트 원이 켜진다.
   *         실패하면 돌아오지 않는다(Error_Handler).
   */
 void rtos_app_init(void);

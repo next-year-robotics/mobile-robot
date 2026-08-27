@@ -10,7 +10,7 @@
 #include <string.h>
 
 /* header 크기를 정렬 배수로 올린다. base가 정렬돼 있고 header가 정렬 배수면
-   payload도 자동으로 정렬된다 — payload 정렬을 따로 계산하지 않는 이유다. */
+   payload도 자동으로 정렬된다. payload 정렬을 따로 계산하지 않는 이유다. */
 #define POOL_HEADER  ((sizeof(static_pool_block_t) + (STATIC_POOL_ALIGN - 1U)) \
                       & ~((size_t)(STATIC_POOL_ALIGN - 1U)))
 
@@ -270,8 +270,8 @@ void *static_pool_realloc(static_pool_t *p, void *ptr, size_t bytes)
     return NULL;
   }
 
-  /* 축소는 제자리에서 끝낸다. 뒤를 잘라 free 리스트에 넣으면 조각이 하나 더
-     생기는데, micro-ROS의 realloc은 대부분 증가 방향이라 이득이 없다. */
+  /* 축소는 제자리에서 끝낸다. 뒤를 잘라 free 리스트에 넣으면 조각이 하나 더 생긴다.
+     micro-ROS의 realloc은 대부분 증가 방향이라 이득이 없다. */
   if (old >= bytes)
   {
     return ptr;
@@ -280,7 +280,7 @@ void *static_pool_realloc(static_pool_t *p, void *ptr, size_t bytes)
   fresh = static_pool_alloc(p, bytes);
   if (fresh == NULL)
   {
-    /* **원래 블록은 살아 있다.** rcutils reallocate 계약이 그렇다. */
+    /* 원래 블록은 살아 있다. rcutils reallocate 계약이 그렇다. */
     return NULL;
   }
 

@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file    health_policy.h
   * @brief   control heartbeat 정체 관측. 순수 상태기계.
-  * @note    HAL/RTOS 비의존. 여기서는 **관측과 판단만** 하고, HealthTask가 반환값을
-  *          IWDG refresh 조건으로 사용한다.
+  * @note    HAL/RTOS 비의존. 여기서는 관측과 판단만 한다. HealthTask가 반환값을 IWDG
+  *          refresh 조건으로 사용한다.
   ******************************************************************************
   */
 #ifndef HEALTH_POLICY_H

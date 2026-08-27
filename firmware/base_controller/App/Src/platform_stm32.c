@@ -74,8 +74,8 @@ void platform_motor_write(const motor_ccr_t *out)
   platform_critical_exit(state);
 }
 
-/* 남은 call site는 platform_motor_kill() 내부 하나뿐이다(2026-08-21 감사).
-   RX 손상 ISR이 여기를 직접 부르던 경로는 urgent STOP 이벤트로 대체했다. */
+/* 남은 call site는 platform_motor_kill() 내부 하나뿐이다. RX 손상 ISR이 여기를
+   직접 부르던 경로는 urgent STOP 이벤트로 대체했다. */
 void platform_motor_zero(void)
 {
   TIM1->CCR1 = 0U;
@@ -86,13 +86,13 @@ void platform_motor_zero(void)
 
 void platform_motor_kill(void)
 {
-  /* 소프트웨어 워치독은 super-loop가 돌아야 동작한다. 여기로 오는 경로는 그게
-     보장되지 않으므로 TIM1 출력을 직접 끊는다. MOE를 내리면 TIM1 출력이 해제되고
-     MDD3A 입력은 10 kOhm 풀다운이 Low로 잡는다.
+  /* 소프트웨어 워치독은 task가 돌아야 동작한다. 여기로 오는 경로는 그게 보장되지
+     않으므로 TIM1 출력을 직접 끊는다. MOE를 내리면 TIM1 출력이 해제되고 MDD3A 입력은
+     10 kOhm 풀다운이 Low로 잡는다.
 
-     치명 경로에서는 핀 차단이 최우선이므로 MOE를 먼저 내리고 CCR을 지운다.
-     BDTR의 read-modify-write는 원자적이지 않지만, 초기화 이후 이 경로는 MOE를
-     내리기만 한다. 락도 할당도 HAL 블로킹 API도 쓰지 않는다. */
+     핀 차단이 최우선이므로 MOE를 먼저 내리고 CCR을 지운다. BDTR의
+     read-modify-write는 원자적이지 않지만 초기화 이후 이 경로는 MOE를 내리기만
+     한다. */
   TIM1->BDTR &= ~TIM_BDTR_MOE;
   platform_motor_zero();
 }
@@ -215,13 +215,13 @@ bool platform_init(void)
   platform_dwt_init();
 
   /* USART2 수신 무장과 TIM6 기동은 여기서 하지 않는다. 두 인터럽트 모두 task를
-     깨우므로 handle과 static 객체가 생긴 뒤, 각 소유 task의 첫머리에서 시작한다. */
+     깨우므로 handle과 static 객체가 생긴 뒤 각 소유 task의 첫머리에서 시작한다. */
   return true;
 }
 
 /**
   * @brief  USART2 수신 완료. 한 바이트를 링에 넣고 즉시 다시 건다.
-  * @note   ISR이다. 송신도 snprintf도 하지 않는다 (M2 규칙 유지).
+  * @note   ISR이다. 송신도 snprintf도 하지 않는다.
   */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -251,7 +251,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   *         - FE/NE/PE만 발생한 경우: HAL이 이미 해당 바이트를 UART_Receive_IT로
   *           읽어 갔고 수신은 계속 무장 상태다. ErrorCode도 HAL이 지운다.
   *           여기서 플래그를 다시 지우면 __HAL_UART_CLEAR_*FLAG가 SR 다음 DR을
-  *           읽으므로 **막 도착한 정상 바이트를 조용히 삼킨다.** 건드리지 않는다.
+  *           읽으므로 막 도착한 정상 바이트를 조용히 삼킨다. 건드리지 않는다.
   *         - ORE가 섞인 경우: HAL이 수신을 끊는다(blocking error). 흐름제어가 없는
   *           링크라 실제로 일어나므로 여기서 되살리지 않으면 명령이 영영 들어오지
   *           않는다. ORE가 아직 서 있을 때만 SR/DR을 읽어 지운다.
@@ -260,7 +260,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
   /* HAL callback은 주변장치마다 있지 않고 하나다. USART1(RPi5 직결)은 소유자가
-     다르므로 여기서 갈라 위임만 하고, 복구 정책은 platform_uart1이 가진다. */
+     다르므로 여기서 갈라 위임만 하고 복구 정책은 platform_uart1이 가진다. */
   if (huart->Instance == USART1)
   {
     platform_uart1_on_error_isr(huart->ErrorCode);

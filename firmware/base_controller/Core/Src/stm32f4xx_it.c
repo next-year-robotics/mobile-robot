@@ -77,8 +77,7 @@ extern TIM_HandleTypeDef htim7;
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-  /* 소프트웨어 워치독은 super-loop가 돌아야 동작한다. 여기로 오면 그게 없으니
-     공통 정지 경로로 TIM1 출력을 직접 끊는다. */
+  /* 여기서 멈추기 전에 TIM1 출력부터 끊는다. */
   platform_motor_kill();
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
@@ -94,8 +93,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-  /* 소프트웨어 워치독은 super-loop가 돌아야 동작한다. 여기로 오면 그게 없으니
-     공통 정지 경로로 TIM1 출력을 직접 끊는다. */
+  /* 여기서 멈추기 전에 TIM1 출력부터 끊는다. */
   platform_motor_kill();
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
@@ -111,8 +109,7 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-  /* 소프트웨어 워치독은 super-loop가 돌아야 동작한다. 여기로 오면 그게 없으니
-     공통 정지 경로로 TIM1 출력을 직접 끊는다. */
+  /* 여기서 멈추기 전에 TIM1 출력부터 끊는다. */
   platform_motor_kill();
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
@@ -128,8 +125,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-  /* 소프트웨어 워치독은 super-loop가 돌아야 동작한다. 여기로 오면 그게 없으니
-     공통 정지 경로로 TIM1 출력을 직접 끊는다. */
+  /* 여기서 멈추기 전에 TIM1 출력부터 끊는다. */
   platform_motor_kill();
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
@@ -145,8 +141,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-  /* 소프트웨어 워치독은 super-loop가 돌아야 동작한다. 여기로 오면 그게 없으니
-     공통 정지 경로로 TIM1 출력을 직접 끊는다. */
+  /* 여기서 멈추기 전에 TIM1 출력부터 끊는다. */
   platform_motor_kill();
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
@@ -212,9 +207,9 @@ void TIM6_DAC_IRQHandler(void)
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
   /* 100 Hz control tick. 여기서 하는 일은 update flag 확인/clear, tick sequence
      증가, DWT timestamp 저장, ControlTask direct notification, PendSV 예약이
-     전부다. 파싱도 계산도 logging도 하지 않는다.
-     플래그를 여기서 지우므로 아래 HAL_TIM_IRQHandler는 어떤 콜백도 부르지 않는다
-     (TIM7 HAL timebase의 PeriodElapsed 경로와 섞이지 않게 하려는 것이기도 하다). */
+     전부다. 파싱도 계산도 logging도 하지 않는다. 플래그를 여기서 지우므로 아래
+     HAL_TIM_IRQHandler는 어떤 콜백도 부르지 않는다. TIM7 HAL timebase의
+     PeriodElapsed 경로와 섞이는 것도 이렇게 막는다. */
   if ((TIM6->SR & TIM_SR_UIF) != 0U)
   {
     TIM6->SR = ~TIM_SR_UIF;

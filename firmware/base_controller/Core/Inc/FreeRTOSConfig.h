@@ -174,7 +174,7 @@ standard names. */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
 
 /* ------------------------------------------------------------------------ */
-/* static-allocation 전용 전환 (2026-08-21)                                   */
+/* static-allocation 전용 전환                                                */
 /*                                                                          */
 /* 위쪽 값들은 CubeMX가 .ioc에서 생성하는 영역이라 직접 고치면 재생성 때 되돌아간다. */
 /* 그래서 최종값은 재생성에도 살아남는 이 USER CODE 구간에서 덮는다.             */
@@ -183,7 +183,7 @@ standard names. */
 /* ------------------------------------------------------------------------ */
 
 /* 동적 할당 경로를 없앤다. heap_4.c는 root CMakeLists.txt 사용자 영역에서 링크
-   대상에서 제외했고, 그 파일 자체가 이 값이 0이면 #error로 빌드를 세운다. */
+   대상에서 제외했다. 그 파일 자체가 이 값이 0이면 #error로 빌드를 세운다. */
 #undef  configSUPPORT_DYNAMIC_ALLOCATION
 #define configSUPPORT_DYNAMIC_ALLOCATION      0
 #undef  configTOTAL_HEAP_SIZE
@@ -204,8 +204,8 @@ standard names. */
 #define INCLUDE_xTaskGetIdleTaskHandle        1
 
 /* ST CMSIS-RTOS v2 wrapper에서 pvPortMalloc을 부르는 API를 컴파일 단계에서 없앤다.
-   이 프로젝트는 두 API를 모두 쓰지 않으며, 남겨 두면 static-only image에 동적
-   할당 참조가 되살아난다. wrapper 파일 자체는 손대지 않는다. */
+   이 프로젝트는 두 API를 모두 쓰지 않는다. 남겨 두면 static-only image에 동적 할당
+   참조가 되살아난다. wrapper 파일 자체는 손대지 않는다. */
 #undef  configUSE_OS2_THREAD_ENUMERATE
 #define configUSE_OS2_THREAD_ENUMERATE        0
 #undef  configUSE_OS2_TIMER

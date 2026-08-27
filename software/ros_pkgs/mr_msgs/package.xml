@@ -3,7 +3,7 @@
 <package format="3">
   <name>mr_msgs</name>
   <version>0.1.0</version>
-  <description>mobile-robot 베이스 인터페이스 메시지. 계약은 interface/base_contract.md.</description>
+  <description>mobile-robot 베이스 인터페이스 메시지.</description>
   <maintainer email="seongho06@khu.ac.kr">emjdp</maintainer>
   <license>Apache-2.0</license>
 

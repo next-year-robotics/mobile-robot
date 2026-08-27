@@ -1,11 +1,11 @@
 """ROS 비의존 차동구동 exact-arc 오도메트리 적분기.
 
-`/joint_states.position`(누적 바퀴 각도 [rad])의 **차분**만 먹는다. `velocity`는 쓰지
-않는다 — BEST_EFFORT 표본이 하나 빠져도 다음 절대 position 차분에 빠진 구간의 이동이
-그대로 들어있기 때문이다(base_contract.md 2절).
+`/joint_states.position`(누적 바퀴 각도 [rad])의 차분만 먹는다. `velocity`는 쓰지 않는다.
+BEST_EFFORT 표본이 하나 빠져도 다음 절대 position 차분에 빠진 구간의 이동이 그대로
+들어있기 때문이다.
 
 이 모듈에는 rclpy import가 없다. 운동학과 이상 표본 판정을 ROS 없이 시험할 수 있어야
-`odom_node.py`의 배선 버그와 적분 버그를 구분할 수 있다(M6 6절).
+`odom_node.py`의 배선 버그와 적분 버그를 구분할 수 있다.
 """
 from __future__ import annotations
 
@@ -13,10 +13,10 @@ import math
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
-# limits.md 2절 물리 상한은 바퀴 각속도 19.26 rad/s (max_tps 7591.8~7853.6,
-# ticks_per_rev 2475.5)다. 여기에 여유를 얹어 "물리적으로 불가능"의 문턱으로 쓴다.
-# 운용 상한 15.23 rad/s가 아니라 물리 상한 기준인 이유: 사람이 손으로 바퀴를 돌리는
-# 경우까지 이 문턱 아래에 있어야 한다. 정상 표본을 이상으로 버리는 쪽이 훨씬 나쁘다.
+# 모터가 낼 수 있는 바퀴 각속도(약 19 rad/s)에 여유를 얹어 "물리적으로 불가능"의
+# 문턱으로 쓴다. 운용 상한이 아니라 물리 상한 기준인 이유는 사람이 손으로 바퀴를
+# 돌리는 경우까지 이 아래에 들어와야 하기 때문이다. 정상 표본을 이상으로 버리는 쪽이
+# 훨씬 나쁘다.
 MAX_WHEEL_SPEED_RAD_S = 25.0
 
 # dt가 아주 작을 때 문턱이 양자화 아래로 내려가지 않게 하는 바닥값 [rad].
@@ -28,7 +28,7 @@ STRAIGHT_DTHETA_RAD = 1e-9
 
 
 class RebaseReason:
-    """pose에 적분하지 않고 기준점만 다시 잡은 이유 (M6 5절)."""
+    """pose에 적분하지 않고 기준점만 다시 잡은 이유."""
 
     FIRST_SAMPLE = 'first_sample'
     MISSING_JOINT = 'missing_joint'
@@ -49,7 +49,7 @@ class RebaseReason:
 
 @dataclass
 class OdometryCounters:
-    """진단용 계수기. 이상 표본과 재기준 횟수를 남긴다 (M6 5절)."""
+    """진단용 계수기. 이상 표본과 재기준 횟수를 남긴다."""
 
     samples: int = 0
     integrated: int = 0
@@ -91,8 +91,8 @@ class DiffDriveOdometry:
     """절대 바퀴 각도 차분을 exact-arc로 적분한다.
 
     좌표·부호 규약은 REP-103이다. `+x` 전진, `+yaw` 반시계.
-    `/joint_states.position`의 부호는 펌웨어가 이미 맞춰 두었으므로
-    (base_contract.md 2절) 여기에 좌우 sign 파라미터는 없다.
+    `/joint_states.position`의 부호는 펌웨어가 이미 맞춰 두었으므로 여기에 좌우 sign
+    파라미터는 없다.
     """
 
     def __init__(
@@ -132,7 +132,7 @@ class DiffDriveOdometry:
     # ------------------------------------------------------------------ 입력
 
     def note_loop_count(self, loop_count: int) -> bool:
-        """`/base/status.loop_count`로 MCU reset을 감지한다 (M6 5절).
+        """`/base/status.loop_count`로 MCU reset을 감지한다.
 
         역행이면 다음 `/joint_states` 표본을 적분하지 않고 기준점으로만 쓴다. reset 뒤
         position이 0으로 돌아온 것을 이동으로 적분하면 odom pose가 순간 점프한다.
@@ -184,9 +184,9 @@ class DiffDriveOdometry:
         dphi_l = phi_l - self._prev_phi_l
         dphi_r = phi_r - self._prev_phi_r
 
-        # 드롭이나 긴 callback 간격만으로 기준점을 버리지 않는다. 문턱을 dt에 비례시키면
-        # 빠진 구간이 길수록 허용 이동도 같이 커져서, 절대 position 차분이 이동을
-        # 복구할 수 있다는 성질이 유지된다.
+        # 드롭이나 긴 callback 간격만으로 기준점을 버리지 않는다. 문턱을 dt에
+        # 비례시키면 빠진 구간이 길수록 허용 이동도 같이 커진다. 그래야 절대 position
+        # 차분이 이동을 복구할 수 있다는 성질이 유지된다.
         allowance = max(self.max_wheel_speed_rad_s * dt, self.min_jump_allowance_rad)
         if abs(dphi_l) > allowance or abs(dphi_r) > allowance:
             self._rebase(RebaseReason.WHEEL_JUMP, stamp_s, phi_l, phi_r)
