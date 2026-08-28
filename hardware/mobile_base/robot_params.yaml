@@ -1,0 +1,31 @@
+# Mobile-base nominal geometry for robot_description/xacro.
+# Length units are metres. Camera angles are degrees.
+# camera_optical_xyz is expressed from base_link, not base_footprint.
+
+# --- Required ---
+base_link_z_m:        0.050
+camera_optical_xyz:   [0.250, 0.000, 0.360]
+camera_pitch_deg:     0.0
+camera_yaw_deg:       0.0
+camera_roll_deg:      0.0
+
+# --- RViz placeholder geometry only; not used for control ---
+# These are the aluminium-frame bounding dimensions, excluding casters.
+chassis_length_m:     0.450
+chassis_width_m:      0.400
+chassis_height_m:     0.368
+
+# --- Nominal drive geometry ---
+# Keep these separate from the calibrated effective odometry values in
+# software/ros_pkgs/mr_base/config/base_params.yaml.
+wheel_separation_m:   0.264
+wheel_radius_m:       0.050
+wheel_width_m:        0.024
+
+# --- Measured total mass and URDF link-mass budget ---
+# The three link classes below sum to the measured 9.8 kg total.  The chassis
+# allocation includes the frame, casters, spring drives, motors, and hardware.
+total_mass_kg:        9.8
+chassis_mass_kg:      8.6
+wheel_mass_kg:        0.5
+camera_mass_kg:       0.2

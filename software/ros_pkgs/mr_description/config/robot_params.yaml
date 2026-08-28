@@ -1,0 +1,27 @@
+# Integration copy of hardware/mobile_base/robot_params.yaml.
+# Length units are metres; mesh files are generated in millimetres.
+base_link_z_m: 0.050
+
+camera_optical_xyz_m: [0.250, 0.000, 0.360]
+camera_mount_rpy_deg: [0.0, 0.0, 0.0]
+camera_box_size_m: [0.024, 0.094, 0.029]  # x depth, y width, z height
+
+chassis_frame_size_m: [0.450, 0.400, 0.368]
+chassis_frame_centre_from_base_link_m: [0.025, 0.000, 0.222517313]
+
+wheel_separation_m: 0.264
+wheel_radius_m: 0.050
+wheel_width_m: 0.024
+
+# The independent CAD preserves the measured cart STEP origin.  Apply this
+# translation in base_link before the millimetre STL is scaled to metres.
+cart_frame_mesh_origin_from_base_link_m: [0.025, 0.000, -0.043482687]
+mesh_scale_m_per_mm: 0.001
+
+# The link-mass budget sums to the measured complete-robot mass. Individual
+# allocations remain dynamics placeholders until final part mass properties are
+# measured; chassis includes frame, casters, spring drives, motors, and hardware.
+total_mass_kg: 9.8
+chassis_mass_kg: 8.6
+wheel_mass_kg: 0.5
+camera_mass_kg: 0.2

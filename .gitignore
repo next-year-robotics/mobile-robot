@@ -14,3 +14,11 @@ firmware/base_controller/micro_ros/library_generation/extra_packages/
 firmware/base_controller/micro_ros/README.md
 firmware/base_controller/test
 software/ros_pkgs/mr_base/test
+
+# Repository-local generated and tool artifacts
+/generated/
+/log/
+/root/
+/*.deb
+hardware/mobile_base/cad/__cadgen__/
+hardware/mobile_base/cad/.*.step.glb

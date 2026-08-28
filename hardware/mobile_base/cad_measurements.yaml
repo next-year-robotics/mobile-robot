@@ -1,0 +1,110 @@
+schema:
+  name: mobile_base_geometry_handoff
+  version: 1
+
+units:
+  length: m
+  angle: deg
+
+sources:
+  measured_on: "2026-08-28"
+  solidworks_assembly: "C:/cad_work/cart/02_assembly/cart_sim.SLDASM"
+  inspected_step: "C:/cad_work/cart/02_assembly/cart_sim.STEP"
+  inspected_step_sha256: "d7e0ad5d666c5597627a7344d5047b54a5cb23394ec2f05fbb10e60a9201cd99"
+  user_dimensions:
+    - measured complete robot mass is 9.8 kg
+    - camera optical centre is 0.410 m above the floor
+    - drive axle midpoint is 0.250 m behind the camera along robot -x
+    - camera is centred laterally and faces straight forward
+    - nominal drive-wheel separation is 0.264 m
+    - nominal drive-wheel radius is 0.050 m
+    - nominal drive-wheel width is 0.024 m
+  annotated_image_role: placement intent only; written dimensions are authoritative
+
+robot_coordinate_system:
+  base_footprint:
+    origin: floor plane intersected by the drive-axle midpoint
+    x_axis: forward
+    y_axis: left
+    z_axis: up
+  base_link:
+    xyz_from_base_footprint_m: [0.000, 0.000, 0.050]
+  angle_signs:
+    camera_pitch_positive: downward
+    camera_yaw_positive: left
+    camera_roll_positive: right-hand rule about +x
+
+mass_properties:
+  measured_total_mass_kg: 9.8
+  urdf_link_mass_budget_kg:
+    base_link: 8.6
+    left_wheel_link: 0.5
+    right_wheel_link: 0.5
+    camera_link: 0.2
+  note: >-
+    The link allocation is a dynamics placeholder constrained to the measured
+    total. Replace individual link masses and inertias after weighing parts or
+    obtaining final CAD mass properties, while preserving the 9.8 kg total.
+
+cad_coordinate_system:
+  origin_note: >-
+    The exported STEP origin is at the aluminium frame plan centre. CAD z=0
+    is 0.006517313 m above the lowest caster envelope, so it is not the floor.
+  x_axis: 0.450 m aluminium-frame direction; +x is robot forward
+  y_axis: 0.400 m aluminium-frame direction; +y is robot left
+  z_axis: up
+  cad_to_robot_axis_rotation_rpy_deg: [0.0, 0.0, 0.0]
+  inferred_ground_plane_z_cad_m: -0.006517313
+  base_footprint_origin_in_cad_m: [-0.025, 0.000, -0.006517313]
+  base_link_origin_in_cad_m: [-0.025, 0.000, 0.043482687]
+
+camera:
+  reference_point: C920 lens optical centre
+  optical_centre_floor_height_m: 0.410
+  optical_centre_from_base_footprint_m: [0.250, 0.000, 0.410]
+  optical_centre_from_base_link_m: [0.250, 0.000, 0.360]
+  optical_centre_in_cad_m: [0.225, 0.000, 0.403482687]
+  pitch_deg: 0.0
+  yaw_deg: 0.0
+  roll_deg: 0.0
+  mount_face:
+    used_for_tf: false
+    forward_normal_robot: [1.0, 0.0, 0.0]
+    note: >-
+      A mount-face-to-lens offset is unnecessary because the optical centre was
+      supplied directly. The C920 and its mount are not present in the current CAD.
+
+drive_wheels:
+  axle_midpoint_from_base_link_m: [0.000, 0.000, 0.000]
+  axle_x_offset_from_camera_m: -0.250
+  left_wheel_centre_from_base_link_m: [0.000, 0.132, 0.000]
+  right_wheel_centre_from_base_link_m: [0.000, -0.132, 0.000]
+  wheel_separation_m: 0.264
+  wheel_radius_m: 0.050
+  wheel_width_m: 0.024
+  exact_side_inset_from_0_400_m_frame_m: 0.068
+  reported_side_inset_m: 0.070
+  side_inset_note: >-
+    The 0.264 m hard-coded wheel separation is authoritative. It places each
+    wheel centre 0.068 m inboard of a 0.400 m-wide frame; 0.070 m is a rounded
+    physical description.
+
+chassis_frame:
+  definition: aluminium extrusion frame only; excludes caster envelopes
+  bbox_min_cad_m: [-0.225, -0.200, 0.082]
+  bbox_max_cad_m: [0.225, 0.200, 0.450]
+  size_m: [0.450, 0.400, 0.368]
+  visual_centre_from_base_link_m: [0.025, 0.000, 0.222517313]
+  bottom_from_floor_m: 0.088517313
+  top_from_floor_m: 0.456517313
+
+current_step_assembly:
+  contents: aluminium frame, four caster mounting plates, and four casters
+  missing: [drive_wheels, drive_motors, C920, camera_mount]
+  bbox_min_cad_m: [-0.257764801, -0.232764801, -0.006517313]
+  bbox_max_cad_m: [0.257764801, 0.232764801, 0.450]
+  size_m: [0.515529602, 0.465529602, 0.456517313]
+
+deferred_outputs:
+  mesh: regenerate from the final CAD after drive and camera hardware are added
+  solidworks_urdf_export: cross-check only after the missing hardware and joints are modelled

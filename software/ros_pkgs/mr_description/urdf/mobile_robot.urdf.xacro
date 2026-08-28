@@ -1,0 +1,186 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mobile_robot">
+  <!-- Managed source. Expanded URDF files are generated artifacts; do not edit or commit them. -->
+  <xacro:arg name="base_link_z" default="0.050"/>
+  <xacro:arg name="camera_x" default="0.250"/>
+  <xacro:arg name="camera_y" default="0.000"/>
+  <xacro:arg name="camera_z" default="0.360"/>
+  <xacro:arg name="camera_roll" default="0.0"/>
+  <xacro:arg name="camera_pitch" default="0.0"/>
+  <xacro:arg name="camera_yaw" default="0.0"/>
+  <xacro:arg name="camera_depth" default="0.024"/>
+  <xacro:arg name="camera_width" default="0.094"/>
+  <xacro:arg name="camera_height" default="0.029"/>
+  <xacro:arg name="chassis_length" default="0.450"/>
+  <xacro:arg name="chassis_width" default="0.400"/>
+  <xacro:arg name="chassis_height" default="0.368"/>
+  <xacro:arg name="chassis_centre_x" default="0.025"/>
+  <xacro:arg name="chassis_centre_y" default="0.000"/>
+  <xacro:arg name="chassis_centre_z" default="0.222517313"/>
+  <xacro:arg name="wheel_separation" default="0.264"/>
+  <xacro:arg name="wheel_radius" default="0.050"/>
+  <xacro:arg name="wheel_width" default="0.024"/>
+  <xacro:arg name="cart_mesh_x" default="0.025"/>
+  <xacro:arg name="cart_mesh_y" default="0.000"/>
+  <xacro:arg name="cart_mesh_z" default="-0.043482687"/>
+  <xacro:arg name="mesh_scale" default="0.001"/>
+  <xacro:arg name="mesh_prefix" default="package://mr_description"/>
+  <!-- 8.6 + 0.5 + 0.5 + 0.2 = measured complete-robot mass 9.8 kg. -->
+  <xacro:arg name="chassis_mass" default="8.6"/>
+  <xacro:arg name="wheel_mass" default="0.5"/>
+  <xacro:arg name="camera_mass" default="0.2"/>
+
+  <xacro:property name="base_link_z_v" value="$(arg base_link_z)"/>
+  <xacro:property name="camera_x_v" value="$(arg camera_x)"/>
+  <xacro:property name="camera_y_v" value="$(arg camera_y)"/>
+  <xacro:property name="camera_z_v" value="$(arg camera_z)"/>
+  <xacro:property name="camera_roll_v" value="$(arg camera_roll)"/>
+  <xacro:property name="camera_pitch_v" value="$(arg camera_pitch)"/>
+  <xacro:property name="camera_yaw_v" value="$(arg camera_yaw)"/>
+  <xacro:property name="camera_depth_v" value="$(arg camera_depth)"/>
+  <xacro:property name="camera_width_v" value="$(arg camera_width)"/>
+  <xacro:property name="camera_height_v" value="$(arg camera_height)"/>
+  <xacro:property name="chassis_length_v" value="$(arg chassis_length)"/>
+  <xacro:property name="chassis_width_v" value="$(arg chassis_width)"/>
+  <xacro:property name="chassis_height_v" value="$(arg chassis_height)"/>
+  <xacro:property name="chassis_centre_x_v" value="$(arg chassis_centre_x)"/>
+  <xacro:property name="chassis_centre_y_v" value="$(arg chassis_centre_y)"/>
+  <xacro:property name="chassis_centre_z_v" value="$(arg chassis_centre_z)"/>
+  <xacro:property name="wheel_separation_v" value="$(arg wheel_separation)"/>
+  <xacro:property name="wheel_radius_v" value="$(arg wheel_radius)"/>
+  <xacro:property name="wheel_width_v" value="$(arg wheel_width)"/>
+  <xacro:property name="cart_mesh_x_v" value="$(arg cart_mesh_x)"/>
+  <xacro:property name="cart_mesh_y_v" value="$(arg cart_mesh_y)"/>
+  <xacro:property name="cart_mesh_z_v" value="$(arg cart_mesh_z)"/>
+  <xacro:property name="mesh_scale_v" value="$(arg mesh_scale)"/>
+  <xacro:property name="chassis_mass_v" value="$(arg chassis_mass)"/>
+  <xacro:property name="wheel_mass_v" value="$(arg wheel_mass)"/>
+  <xacro:property name="camera_mass_v" value="$(arg camera_mass)"/>
+
+  <material name="aluminium">
+    <color rgba="0.62 0.68 0.78 1.0"/>
+  </material>
+  <material name="rubber">
+    <color rgba="0.025 0.025 0.03 1.0"/>
+  </material>
+  <material name="camera_black">
+    <color rgba="0.04 0.04 0.05 1.0"/>
+  </material>
+
+  <xacro:macro name="box_inertial" params="mass x y z origin_x origin_y origin_z">
+    <inertial>
+      <origin xyz="${origin_x} ${origin_y} ${origin_z}" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${mass * (y * y + z * z) / 12.0}"
+        ixy="0.0" ixz="0.0"
+        iyy="${mass * (x * x + z * z) / 12.0}"
+        iyz="0.0"
+        izz="${mass * (x * x + y * y) / 12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="drive_wheel" params="side y">
+    <link name="${side}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="$(arg mesh_prefix)/meshes/drive_wheel.stl"
+                scale="${mesh_scale_v} ${mesh_scale_v} ${mesh_scale_v}"/>
+        </geometry>
+        <material name="rubber"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius_v}" length="${wheel_width_v}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass_v}"/>
+        <inertia
+          ixx="${wheel_mass_v * (3.0 * wheel_radius_v * wheel_radius_v + wheel_width_v * wheel_width_v) / 12.0}"
+          ixy="0.0" ixz="0.0"
+          iyy="${wheel_mass_v * wheel_radius_v * wheel_radius_v / 2.0}"
+          iyz="0.0"
+          izz="${wheel_mass_v * (3.0 * wheel_radius_v * wheel_radius_v + wheel_width_v * wheel_width_v) / 12.0}"/>
+      </inertial>
+    </link>
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${side}_wheel_link"/>
+      <origin xyz="0 ${y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="15.0" velocity="20.0"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+  </xacro:macro>
+
+  <link name="base_footprint"/>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="${cart_mesh_x_v} ${cart_mesh_y_v} ${cart_mesh_z_v}" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="$(arg mesh_prefix)/meshes/cart_frame.stl"
+              scale="${mesh_scale_v} ${mesh_scale_v} ${mesh_scale_v}"/>
+      </geometry>
+      <material name="aluminium"/>
+    </visual>
+    <collision>
+      <origin xyz="${chassis_centre_x_v} ${chassis_centre_y_v} ${chassis_centre_z_v}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length_v} ${chassis_width_v} ${chassis_height_v}"/>
+      </geometry>
+    </collision>
+    <xacro:box_inertial
+      mass="${chassis_mass_v}"
+      x="${chassis_length_v}" y="${chassis_width_v}" z="${chassis_height_v}"
+      origin_x="${chassis_centre_x_v}" origin_y="${chassis_centre_y_v}" origin_z="${chassis_centre_z_v}"/>
+  </link>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${base_link_z_v}" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:drive_wheel side="left" y="${wheel_separation_v / 2.0}"/>
+  <xacro:drive_wheel side="right" y="${-wheel_separation_v / 2.0}"/>
+
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${camera_depth_v} ${camera_width_v} ${camera_height_v}"/>
+      </geometry>
+      <material name="camera_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${camera_depth_v} ${camera_width_v} ${camera_height_v}"/>
+      </geometry>
+    </collision>
+    <xacro:box_inertial
+      mass="${camera_mass_v}"
+      x="${camera_depth_v}" y="${camera_width_v}" z="${camera_height_v}"
+      origin_x="0" origin_y="0" origin_z="0"/>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="${camera_x_v} ${camera_y_v} ${camera_z_v}"
+            rpy="${camera_roll_v} ${camera_pitch_v} ${camera_yaw_v}"/>
+  </joint>
+
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+    <!-- optical +Z=forward, +X=right, +Y=down from robot +X/+Y/+Z -->
+    <origin xyz="0 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+  </joint>
+</robot>
