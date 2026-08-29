@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<package format="3">
+  <name>mr_aruco_msgs</name>
+  <version>0.1.0</version>
+  <description>ArUco 인지·정렬 계층 메시지와 액션.</description>
+  <maintainer email="seongho06@khu.ac.kr">emjdp</maintainer>
+  <license>Apache-2.0</license>
+
+  <!--
+    mr_msgs와 나누어 둔 이유는 펌웨어 빌드다. build_libmicroros.sh가 mr_msgs를
+    통째로 extra_packages로 복사해 libmicroros.a에 넣는데, MCU가 쓰지도 않는
+    액션 타입까지 그 정적 라이브러리에 들어가면 플래시만 먹는다. mr_msgs는
+    MCU와 주고받는 타입만, 이 패키지는 호스트 안에서만 도는 타입만 담는다.
+  -->
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <depend>std_msgs</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>action_msgs</depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
