@@ -1,0 +1,53 @@
+# usb_cam — Logitech C920.
+#
+# 노드는 `camera` 네임스페이스에 띄운다. usb_cam이 상대 토픽명("image_raw",
+# "camera_info")을 쓰기 때문에(usb_cam_node.cpp) 네임스페이스가 곧 토픽 접두사다.
+# 결과: /camera/image_raw, /camera/camera_info.
+/**:
+  ros__parameters:
+    # udev 규칙으로 고정 심볼릭을 만들어 두는 편이 낫다. /dev/video* 번호는
+    # 부팅마다 바뀔 수 있고, 그러면 카메라 대신 엉뚱한 장치를 연다.
+    video_device: /dev/video0
+
+    # **해상도를 바꾸지 말 것.** c920_calibration.yaml의 내부 파라미터가 이
+    # 해상도 기준이다. (mr_description/config/c920_calibration.yaml 주석 참조)
+    image_width: 1280
+    image_height: 720
+    # 30 fps는 커널 V4L2 경로가 실제로 유지한다 — 4버퍼 32 ms 간격, DQBUF
+    # 시점의 버퍼 타임스탬프 지연 8 ms로 실측했다. 한때 0.28~0.92 s로 보이던
+    # 지연은 큐가 아니라 usb_cam 0.8.1의 epoch 변환 단위 오류였고, 워크스페이스
+    # 오버레이 패치로 고쳤다. (M7-M13.md "usb_cam 타임스탬프 결함" 참조)
+    framerate: 30.0            # double이어야 한다. int를 주면 usb_cam이 거절한다.
+
+    # raw_mjpeg이 아니라 mjpeg2rgb다. usb_cam 0.8.1의 raw_mjpeg 경로는 줄무늬가
+    # 생기는 것으로 maknae에서 확인됐고, 지금 apt 후보가 정확히 0.8.1이다.
+    # mjpeg2rgb는 libavcodec으로 디코드하는 다른 경로라 그 문제를 피한다.
+    # 이게 실패하면 yuyv로 내리고 framerate를 낮춘다.
+    pixel_format: mjpeg2rgb
+    av_device_format: YUV422P
+    io_method: mmap
+
+    # aruco_opencv의 output_frame 변환이 이 값을 소스로 잡는다. 여기가 틀리면
+    # TF 조회가 실패해 "검출은 되는데 좌표가 안 나오는" 고장이 된다.
+    frame_id: camera_optical_frame
+
+    camera_name: c920
+    camera_info_url: package://mr_description/config/c920_calibration.yaml
+
+    # **초점 고정이 재사용한 캘리브레이션의 전제다.** AF가 돌면 초점거리가
+    # 피사체 거리에 따라 변하고, 그러면 fx가 캘리브레이션 값과 갈린다.
+    # Pi의 현재 커널이 노출하는 V4L2 제어명과 usb_cam 0.8.1이 찾는
+    # 예전 제어명이 달라, launch_common.py가 v4l2-ctl로 AF를 먼저 끈다.
+    # focus_absolute는 스트리밍 중 C920이 EIO로 거절하므로 usb_cam에서
+    # 덮어쓰지 않는다. launch_common.py가 카메라를 열기 전에 AF를 끈 다음
+    # focus_absolute=0을 별도 ioctl로 적용한다. 실측 정합성은 M7 게이트다.
+    autofocus: false
+    focus: -1
+
+    autoexposure: true
+    auto_white_balance: true
+    brightness: -1
+    contrast: -1
+    saturation: -1
+    sharpness: -1
+    gain: -1

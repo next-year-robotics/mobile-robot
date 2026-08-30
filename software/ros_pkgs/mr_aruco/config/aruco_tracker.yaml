@@ -1,0 +1,62 @@
+# aruco_opencv의 aruco_tracker 파라미터.
+#
+# 이 파일은 apt로 설치한 ros-jazzy-aruco-opencv가 읽는다. 우리 코드가 아니므로
+# 파라미터 이름은 그쪽 규약을 따른다. 기본값 전체는 다음에서 볼 수 있다.
+#   /opt/ros/jazzy/share/aruco_opencv/config/aruco_tracker.yaml
+/**:
+  ros__parameters:
+    # 이미지 토픽의 base 이름. camera_info는 image_transport가 형제 토픽으로
+    # 유도한다(<base>/camera_info). 따로 지정하는 파라미터가 없다.
+    cam_base_topic: /camera/image_raw
+
+    # 검출 결과를 이 프레임으로 변환해서 낸다. 비워 두면 카메라 광학 좌표계
+    # 그대로 나오고, 그러면 tvec.z를 전진 방향으로 착각하는 사고가 난다.
+    # 변환 소스는 이미지 헤더의 frame_id이므로 usb_cam의 frame_id가
+    # camera_optical_frame이어야 한다. (base_contract.md "좌표계")
+    output_frame: base_footprint
+
+    marker_dict: 4X4_50
+
+    # base_contract.md가 원본이다. 인쇄물 실측값과 다르면 거리가 같은 비율로
+    # 틀어지므로, 자로 잰 값을 여기 넣는다.
+    marker_size: 0.15
+
+    # usb_cam은 왜곡 보정을 하지 않은 원본을 낸다. false여야 검출기가
+    # CameraInfo의 D를 써서 직접 보정한다.
+    image_is_rectified: false
+    image_sub_compressed: false
+    image_sub_qos:
+      reliability: 2   # best effort — 센서 스트림이라 재전송이 가치를 안 만든다
+      durability: 2
+      depth: 1
+
+    # rviz에서 마커 위치를 눈으로 확인할 때 쓴다. 부하가 크지 않다.
+    publish_tf: true
+
+    pose_selector:
+      # 정면에 가까운 마커는 PnP 해가 둘 나올 수 있다. 재투영 오차가 작은 쪽을
+      # 고른다. 정렬에서 자세가 뒤집혀 튀면 PLANE_NORMAL_PARALLEL을 시험해 볼 것.
+      strategy: REPROJECTION_ERROR
+      debug: false
+
+    aruco:
+      adaptiveThreshWinSizeMin: 3
+      adaptiveThreshWinSizeMax: 23
+      adaptiveThreshWinSizeStep: 10
+      # 모서리를 서브픽셀로 다듬는다. 거리 정확도에 직접 영향을 준다.
+      cornerRefinementMethod: 2   # 0 없음 / 1 Subpix / 2 Contour
+      # **끄는 것이 맞다.** 켰던 이유는 720p30에서 관측 stamp가 약 0.7 s
+      # 늦는 현상이었는데, 9.12절에서 원인이 검출 부하가 아니라 usb_cam 0.8.1의
+      # epoch 변환 단위 오류로 밝혀졌고 오버레이 패치로 닫혔다.
+      #
+      # 켜 두면 원거리 마커를 조용히 놓친다. 3 m에 세운 150 mm 마커(실측 변
+      # 46 px)를 저장 프레임으로 재현한 결과다.
+      #
+      #   기본값 / CONTOUR 정련만          -> id 10 검출
+      #   ArUco3 + ratio 0.02 / 0.015 / 0.01 -> 검출 없음
+      #   ArUco3 + ratio 0.005 이하          -> id 10 검출
+      #
+      # "1280 폭의 2%(26 px)보다 작은 후보만 생략"이라는 원래 주석의 전제가
+      # 틀렸다. 46 px 후보가 실제로 걸러진다 — 다운샘플이 그만큼 공격적이다.
+      # 다시 켜려면 ratio를 0.005 이하로 두고 운용 최대 거리에서 재확인할 것.
+      useAruco3Detection: false

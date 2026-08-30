@@ -1,0 +1,44 @@
+# align 노드 — 고정 마커 정렬.
+#
+# 게인은 maknae mm_control/config/align.yaml에서 승계했다. 그쪽은 시뮬에서만
+# 검증됐고 실기 폐루프는 끝까지 확인된 적이 없다(maknae ROADMAP). 실측으로 다시 잡을 것.
+#
+# 게인 값은 그대로 두고 **제어법만 고쳤다(2026-08-28)** — 앞의 두 단계가 마커 중심이
+# 아니라 진입점(마커 법선 위 standoff 지점)을 조준한다. 승계본은 횡방향 오차를 닫는
+# 항이 없어 법선 축에서 벗어나 출발하면 시작 오프셋의 약 1/4이 그대로 남았다.
+align:
+  ros__parameters:
+    control_rate_hz: 20.0
+    cmd_frame_id: base_footprint
+    abort_on_oscillation: true
+
+    standoff_m: 0.45
+
+    k_bearing: 1.4
+    k_dist: 0.8
+    k_final_yaw: 0.6
+
+    # 추종보다 느리다. 거리가 짧고 목적이 정밀도다.
+    max_linear_mps: 0.15
+    max_angular_rps: 0.7
+    max_linear_accel: 0.5
+    max_angular_accel: 2.5
+    min_linear_mps: 0.004
+    min_angular_rps: 0.008
+
+    # 단계 전이 히스테리시스. 문턱이 하나면 접근 중에 두 단계를 왕복한다.
+    yaw_enter_tol_rad: 0.06
+    yaw_exit_tol_rad: 0.20
+    # 진입점까지 남은 거리가 이만큼이면 FINAL. goal의 위치 허용오차가 더 크면 그쪽.
+    dist_enter_tol_m: 0.03
+
+    stale_timeout_s: 0.4         # 낡으면 정지하고 기다린다 (실패 아님)
+    loss_timeout_s: 3.0          # 그 상태가 이어지면 실패
+    oscillation_window: 30
+    oscillation_flips: 8
+
+    # goal이 0을 주면 쓰는 기본 허용오차.
+    default_dist_tol_m: 0.04
+    default_yaw_tol_rad: 0.14
+    default_stable_time_s: 1.0
+    default_timeout_s: 60.0

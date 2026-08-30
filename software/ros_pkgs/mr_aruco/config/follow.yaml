@@ -1,0 +1,33 @@
+# follow 노드 — 작업자 추종.
+#
+# 값들은 M11 착수 시점의 초기값이다. 실주행 튜닝 결과로 갱신할 것.
+follow:
+  ros__parameters:
+    control_rate_hz: 20.0        # MCU 워치독 200 ms 대비 4배 여유
+    enabled_on_start: false      # 반드시 서비스로 명시적으로 켠다
+    cmd_frame_id: base_footprint
+
+    target_range_m: 1.1
+
+    k_range: 0.6
+    k_bearing: 1.2
+    k_bearing_d: 0.1
+    derivative_tau_s: 0.15
+
+    # limits.md의 물리 상한(v_max 0.76)이 아니라 운용 상한이다. 외부 센서가
+    # 없으므로 낮게 잡는다. 정지 지연 상한이 워치독 200 ms라 0.25 m/s에서 5 cm다.
+    max_linear_mps: 0.25
+    max_angular_rps: 0.7
+    max_linear_accel: 0.4
+    max_angular_accel: 2.0
+
+    range_deadband_m: 0.12
+    bearing_deadband_rad: 0.07   # 약 4도
+    align_first_rad: 0.44        # 약 25도. 이보다 크면 제자리 회전만.
+
+    min_linear_mps: 0.005
+    min_angular_rps: 0.01
+
+    # 마커 좌표는 base_footprint 기준이라 로봇이 움직이면 낡는다.
+    # 0.25 m/s * 0.4 s = 10 cm로, 거리 데드밴드 0.12 m 안이다.
+    marker_timeout_s: 0.4
