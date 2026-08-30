@@ -1,0 +1,36 @@
+# /cmd_vel 중재. M8부터 이 노드만 /cmd_vel에 발행한다.
+#
+# 계약 원본은 0_tmp/adocs/interface/base_contract.md의 "인지·자율 제어 계층" 절이다.
+twist_mux:
+  ros__parameters:
+    # 베이스가 TwistStamped만 받는다. false로 두면 twist_mux가 Twist를 내보내고,
+    # MCU 구독과 타입이 안 맞아 **아무 경고 없이** 연결되지 않는다.
+    # (twist_mux 4.4.0에서 추가, 4.5.0에서 파라미터 선언 회귀 수정)
+    use_stamped: true
+
+    topics:
+      # 사람이 잡으면 사람이 이긴다.
+      teleop:
+        topic: cmd_vel_teleop
+        timeout: 0.3
+        priority: 100
+      # 정렬은 목표가 있는 짧은 동작이라 추종보다 위다.
+      align:
+        topic: cmd_vel_align
+        timeout: 0.3
+        priority: 60
+      follow:
+        topic: cmd_vel_follow
+        timeout: 0.3
+        priority: 50
+
+    locks:
+      # timeout 0.0은 "발행자가 죽어도 락이 걸리지 않는다"는 뜻이다. 지금은 수동
+      # e-stop이라 이게 맞다. 하트비트 발행자가 생기면 0.5로 올려 fail-safe로 바꾼다.
+      #
+      # 주의: 락이 걸려도 twist_mux는 0을 쏘지 않고 전달을 멈출 뿐이다.
+      # 실제 정지는 MCU 워치독 200 ms가 만든다.
+      estop:
+        topic: safety/lock
+        timeout: 0.0
+        priority: 255

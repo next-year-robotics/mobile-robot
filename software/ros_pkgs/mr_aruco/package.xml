@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<package format="3">
+  <name>mr_aruco</name>
+  <version>0.1.0</version>
+  <description>ArUco 마커 추적 필터와 작업자 추종·고정 마커 정렬 제어.</description>
+  <maintainer email="seongho06@khu.ac.kr">emjdp</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>aruco_opencv</depend>
+  <depend>aruco_opencv_msgs</depend>
+  <depend>mr_aruco_msgs</depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<package format="3">
+  <name>mr_bringup</name>
+  <version>0.1.0</version>
+  <description>launch 파일과 카메라·twist_mux 설정.</description>
+  <maintainer email="seongho06@khu.ac.kr">emjdp</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>usb_cam</exec_depend>
+  <exec_depend>twist_mux</exec_depend>
+  <exec_depend>aruco_opencv</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>v4l-utils</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>mr_base</exec_depend>
+  <exec_depend>mr_aruco</exec_depend>
+  <exec_depend>mr_description</exec_depend>
+  <!-- micro_ros_agent는 별도 워크스페이스에 있을 수 있어 의존으로 걸지 않는다. -->
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

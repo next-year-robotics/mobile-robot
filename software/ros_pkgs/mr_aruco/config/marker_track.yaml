@@ -1,0 +1,39 @@
+# marker_track 노드 — 대상 마커 선택과 추적 필터.
+marker_track:
+  ros__parameters:
+    # 작업자 조끼 = 0, 고정 정렬 타깃 = 10 (base_contract.md).
+    # 정렬을 하려면 이 값을 10으로 바꿔야 한다. 한 노드가 id 하나만 본다.
+    target_marker_id: 0
+
+    output_frame: base_footprint
+
+    # 150 mm ID 0의 렌즈 기준 1.0/2.0 m 30표본에서 PnP 거리가
+    # measured = 1.0408754 * true로 나왔다. 그 역수를 카메라 상대
+    # 병진벡터에만 적용한다. marker_size=0.15와 카메라 TF는 실측값이므로
+    # 바꾸지 않는다. 보정에 쓰지 않은 1.5 m 홀드아웃에서 기대 rho
+    # 1.750 m 대비 1.74396 m(-0.60 cm)로 검증했다.
+    pnp_translation_scale: 0.960729786
+    # base_footprint 기준 C920 광학 중심. mr_description 실측 TF와 같아야 한다.
+    camera_origin_xyz_m: [0.250, 0.000, 0.410]
+
+    # 락이 걸리기까지 필요한 연속 검출 시간. 30 Hz 검출에서 약 9프레임이다.
+    min_stable_s: 0.3
+
+    # 검출이 끊긴 뒤 직전 값을 유지하는 상한. 제어기의 marker_timeout(0.4 s)보다
+    # 길어야 hold가 의미를 갖는다. 단, 유지값으로 주행하지는 않는다 —
+    # header.stamp가 멈춰 있어 제어기가 알아서 정지한다.
+    max_hold_s: 1.0
+
+    # 보행 속도 1.5 m/s에 30 Hz면 프레임당 5 cm다. 그 두 배를 문턱으로 둔다.
+    max_jump_pos_m: 0.10
+    max_jump_yaw_rad: 0.35
+    reject_streak_unlock: 8
+
+    # 법선의 지면 투영이 이보다 짧으면 yaw를 안 믿는다. 0.2면 수직에서 약 12도.
+    min_normal_horizontal: 0.2
+
+    # 검출 메시지 자체가 이만큼 끊기면 파이프라인이 죽은 것으로 본다.
+    detection_gap_timeout_s: 0.3
+    watchdog_period_s: 0.1
+
+    publish_dock_pose: true
