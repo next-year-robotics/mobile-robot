@@ -1,0 +1,17 @@
+--- a/include/usb_cam/utils.hpp
++++ b/include/usb_cam/utils.hpp
+@@ -93,8 +93,13 @@
+   const int64_t uptime_us =
+     monotonic_time.tv_sec * 1000000 + static_cast<int64_t>(
+     std::round(monotonic_time.tv_nsec / 1000.0));
++  // 상류 0.8.1 결함 수정: tv_usec는 이미 마이크로초다. 1000으로 나누면
++  // 밀리초가 되어 epoch_us가 노드 기동 순간의 소수점 이하 초만큼 작아지고,
++  // 그 결과 모든 header.stamp가 0~1 s 무작위로 과거에 찍힌다. 세션마다
++  // 값이 달라지고(실측 0.284~0.92 s) 하류의 신선도 게이트가 정상 표본을
++  // 전부 기각한다. (mobile-robot M7 계측 참조)
+   const int64_t epoch_us =
+-    epoch_time.tv_sec * 1000000 + epoch_time.tv_usec / 1000.0;
++    epoch_time.tv_sec * 1000000 + epoch_time.tv_usec;
+ 
+   return static_cast<time_t>(epoch_us - uptime_us);
+ }
