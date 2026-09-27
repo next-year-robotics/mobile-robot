@@ -1,0 +1,16 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!--
+  phone-bridge/1 mDNS 광고(PROTOCOL.md 2장 7.1). 앱은 NsdManager로 _mr-phone-bridge._tcp를 찾는다.
+  설치(RPi5):  sudo cp mr-phone-bridge.service /etc/avahi/services/  (avahi-daemon이 자동으로 다시 읽는다)
+  robot_id와 port는 config/phone_bridge.yaml과 같아야 한다.
+-->
+<service-group>
+  <name replace-wildcards="yes">mr-phone-bridge on %h</name>
+  <service>
+    <type>_mr-phone-bridge._tcp</type>
+    <port>8765</port>
+    <txt-record>api=1</txt-record>
+    <txt-record>robot_id=mr-001</txt-record>
+  </service>
+</service-group>
