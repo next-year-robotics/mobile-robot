@@ -1,0 +1,15 @@
+# mr_care_telemetry 파라미터. 데이터 모델은 software/contracts/care-telemetry/v1/README.md.
+mr_care_telemetry:
+  ros__parameters:
+    robot_id: "mr-001"
+    display_name: "돌봄 로봇 1호"
+    database_url: "https://senior-care-nyr-default-rtdb.asia-southeast1.firebasedatabase.app"
+    service_account_path: "~/.config/mr_care_telemetry/service-account.json"   # 저장소에 넣지 않는다
+    emulator_host: ""                 # 예 "127.0.0.1:9000". 비우면 FIREBASE_DATABASE_EMULATOR_HOST, 그것도 없으면 실제 DB
+    queue_db_path: "~/.local/state/mr_care_telemetry/queue.db"
+    status_period_s: 5.0
+    app_status_stale_s: 6.0           # /robot/app_status가 이보다 오래되면 mission_state=unknown
+    publish_sos_location: true        # P2. false면 /sos 노드를 쓰지 않는다
+    publish_diag: false               # P2. true면 /joint_states도 구독해 /diag를 쓴다
+    max_events: 1000
+    marker_track_topic: "/marker_track"
