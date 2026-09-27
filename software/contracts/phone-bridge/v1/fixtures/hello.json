@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "type": "hello",
+  "id": "c3c4a81d-f25b-487c-8f28-4ac47a9eaf70",
+  "sent_at_ms": 1787792400000,
+  "reply_to": null,
+  "payload": {
+    "app_instance_id": "9e889e5d-1c2d-4572-9513-9cd8283c917a",
+    "app_version": "0.1.0",
+    "platform": "android",
+    "capabilities": [
+      "location.cache",
+      "location.fresh",
+      "place.edit"
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "type": "place.catalog",
+  "id": "da32d958-c86e-414a-b72f-edb9402948e8",
+  "sent_at_ms": 1787792400100,
+  "reply_to": null,
+  "payload": {
+    "revision": "2026-08-27T12:00:00Z",
+    "max_places": 12,
+    "default_origin_place_id": "place_home",
+    "places": [
+      {
+        "id": "place_home",
+        "kind": "home",
+        "label": "집",
+        "lat": 36.1234,
+        "lon": 128.5678,
+        "radius_m": 20,
+        "enabled": true,
+        "sort_order": 10,
+        "is_default_origin": true,
+        "address": "경상북도 …"
+      },
+      {
+        "id": "place_market",
+        "kind": "market",
+        "label": "시장",
+        "lat": 36.1251,
+        "lon": 128.5702,
+        "radius_m": 30,
+        "enabled": true,
+        "sort_order": 20,
+        "is_default_origin": false,
+        "address": null
+      }
+    ]
+  }
+}

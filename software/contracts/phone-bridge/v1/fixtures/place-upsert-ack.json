@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "type": "ack",
+  "id": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+  "sent_at_ms": 1787792500300,
+  "reply_to": "6d1f3f1e-5f6a-4a0e-9f6b-0a2f0a3f2b11",
+  "payload": {
+    "status": "accepted",
+    "place_id": "place_senior_center",
+    "catalog_revision": "2026-08-27T12:05:00Z"
+  }
+}

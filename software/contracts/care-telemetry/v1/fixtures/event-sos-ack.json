@@ -1,0 +1,14 @@
+{
+  "ts_ms": 1790000000600,
+  "kind": "sos.ack",
+  "severity": "info",
+  "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+  "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c",
+  "message": "어르신 폰이 응답했어요",
+  "data": {
+    "app_received": true,
+    "retries": 0,
+    "location": "cache",
+    "accuracy_bucket": "good"
+  }
+}

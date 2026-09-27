@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "type": "heartbeat",
+  "id": "1392a54d-c195-489f-88bb-a20022eef8b5",
+  "sent_at_ms": 1787792402000,
+  "reply_to": null,
+  "payload": {
+    "session_id": "e2840b5b-f31f-4bba-a8ca-5b140c34cb1d"
+  }
+}

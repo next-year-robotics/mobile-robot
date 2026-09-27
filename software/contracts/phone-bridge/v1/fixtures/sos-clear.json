@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "type": "sos.clear",
+  "id": "18dcbcc2-ecc8-48b9-9312-727947f9cb52",
+  "sent_at_ms": 1787792450000,
+  "reply_to": null,
+  "payload": {
+    "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c",
+    "resolution": "tracking_recovered"
+  }
+}

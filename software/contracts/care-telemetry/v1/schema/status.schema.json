@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "care-telemetry/1 robots/{robot_id}/status",
+  "type": "object",
+  "required": ["updated_at_ms", "agent", "bridge_state", "mission_state", "tracking_state", "trip_id", "from_place_id", "to_place_id", "battery_percent", "last_error", "phone_link"],
+  "properties": {
+    "updated_at_ms": { "type": "integer", "minimum": 0 },
+    "agent": {
+      "type": "object", "required": ["version", "uptime_s", "queue_len"],
+      "properties": { "version": { "type": "string" }, "uptime_s": { "type": "integer", "minimum": 0 }, "queue_len": { "type": "integer", "minimum": 0 } }
+    },
+    "bridge_state": { "type": "string", "enum": ["ready", "degraded", "error", "unknown"] },
+    "mission_state": { "type": "string", "enum": ["idle", "starting", "active", "arrived", "cancelling", "cancelled", "error", "unknown"] },
+    "tracking_state": { "type": "string", "enum": ["unavailable", "searching", "following", "lost", "error", "unknown"] },
+    "trip_id": { "type": ["string", "null"] },
+    "from_place_id": { "type": ["string", "null"] },
+    "to_place_id": { "type": ["string", "null"] },
+    "battery_percent": { "oneOf": [ { "type": "number", "minimum": 0, "maximum": 100 }, { "type": "null" } ] },
+    "last_error": { "type": ["string", "null"] },
+    "phone_link": {
+      "type": "object", "required": ["connected", "last_seen_ms"],
+      "properties": { "connected": { "type": "boolean" }, "last_seen_ms": { "type": "integer", "minimum": 0 } }
+    },
+    "base": {
+      "type": "object", "required": ["agent_state", "cmd_watchdog_ok", "last_seen_ms"],
+      "properties": {
+        "agent_state": { "type": "string", "enum": ["waiting", "available", "connected", "disconnected", "unknown"] },
+        "cmd_watchdog_ok": { "type": "boolean" },
+        "last_seen_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

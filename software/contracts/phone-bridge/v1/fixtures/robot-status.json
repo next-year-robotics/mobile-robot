@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "robot.status",
+  "id": "025832dc-f9ed-48bd-8354-602d314d27ad",
+  "sent_at_ms": 1787792414000,
+  "reply_to": null,
+  "payload": {
+    "robot_id": "mr-001",
+    "bridge_state": "ready",
+    "mission_state": "active",
+    "tracking_state": "unavailable",
+    "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+    "from_place_id": "place_home",
+    "to_place_id": "place_market",
+    "battery_percent": null,
+    "last_error": null
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "robot.status",
+  "id": "7e8f9a0b-1c2d-4e3f-a4b5-c6d7e8f9a0b1",
+  "sent_at_ms": 1787792400200,
+  "reply_to": null,
+  "payload": {
+    "robot_id": "mr-001",
+    "bridge_state": "ready",
+    "mission_state": "idle",
+    "tracking_state": "unavailable",
+    "trip_id": null,
+    "from_place_id": null,
+    "to_place_id": null,
+    "battery_percent": null,
+    "last_error": null
+  }
+}

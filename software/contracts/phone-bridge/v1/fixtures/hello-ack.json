@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "type": "hello.ack",
+  "id": "97fe12c8-5dd6-4de6-b638-a091db31b991",
+  "sent_at_ms": 1787792400042,
+  "reply_to": "c3c4a81d-f25b-487c-8f28-4ac47a9eaf70",
+  "payload": {
+    "session_id": "e2840b5b-f31f-4bba-a8ca-5b140c34cb1d",
+    "robot_id": "mr-001",
+    "server_version": "0.1.0",
+    "heartbeat_interval_ms": 2000,
+    "heartbeat_timeout_ms": 10000,
+    "catalog_revision": "2026-08-27T12:00:00Z",
+    "place_edit_enabled": true,
+    "max_places": 12
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "updated_at_ms": 1790000000000,
+  "agent": {
+    "version": "0.1.0",
+    "uptime_s": 3600,
+    "queue_len": 0
+  },
+  "bridge_state": "ready",
+  "mission_state": "active",
+  "tracking_state": "following",
+  "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+  "from_place_id": "place_home",
+  "to_place_id": "place_market",
+  "battery_percent": null,
+  "last_error": null,
+  "phone_link": {
+    "connected": true,
+    "last_seen_ms": 1789999999000
+  },
+  "base": {
+    "agent_state": "connected",
+    "cmd_watchdog_ok": true,
+    "last_seen_ms": 1789999999900
+  }
+}

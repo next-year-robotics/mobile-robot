@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "care-telemetry/1 robots/{robot_id}/events/{event_id}",
+  "type": "object",
+  "required": ["ts_ms", "kind", "severity", "message"],
+  "properties": {
+    "ts_ms": { "type": "integer", "minimum": 0 },
+    "kind": {
+      "type": "string",
+      "enum": ["agent.online", "agent.offline", "link.connected", "link.disconnected", "trip.start", "trip.arrived", "trip.cancelled", "trip.error", "sos.request", "sos.ack", "sos.clear", "error"]
+    },
+    "severity": { "type": "string", "enum": ["info", "warning", "critical"] },
+    "trip_id": { "type": ["string", "null"] },
+    "sos_id": { "type": ["string", "null"] },
+    "message": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "data": {
+      "type": "object",
+      "not": { "anyOf": [ { "required": ["lat"] }, { "required": ["lon"] } ] },
+      "description": "kind별 부가 정보. 좌표(lat/lon)는 금지."
+    }
+  }
+}

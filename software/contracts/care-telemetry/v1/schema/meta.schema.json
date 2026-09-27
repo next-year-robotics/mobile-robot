@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "care-telemetry/1 robots/{robot_id}/meta",
+  "type": "object",
+  "required": ["robot_id", "display_name", "agent_version", "first_seen_ms"],
+  "properties": {
+    "robot_id": { "type": "string", "minLength": 1 },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "agent_version": { "type": "string" },
+    "first_seen_ms": { "type": "integer", "minimum": 0 }
+  }
+}
