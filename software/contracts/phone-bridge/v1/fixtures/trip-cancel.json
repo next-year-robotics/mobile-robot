@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "type": "trip.cancel",
+  "id": "1a0ad887-2680-465d-af4a-c1956efe2a58",
+  "sent_at_ms": 1787792413000,
+  "reply_to": null,
+  "payload": {
+    "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+    "reason": "user_request"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "type": "error",
+  "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "sent_at_ms": 1787792500300,
+  "reply_to": "6d1f3f1e-5f6a-4a0e-9f6b-0a2f0a3f2b11",
+  "payload": {
+    "code": "CATALOG_CONFLICT",
+    "message": "catalog_revision is stale",
+    "retryable": true
+  }
+}

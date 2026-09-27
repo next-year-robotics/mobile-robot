@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/next-year-robotics/mobile-robot/main/software/contracts/phone-bridge/v1/schema/messages.schema.json",
+  "title": "phone-bridge/1 message",
+  "description": "RPi5 mr_phone_bridge <-> Android 앱 WebSocket 메시지. 모든 메시지는 공통 envelope를 쓰고 type별 payload 스키마를 갖는다. 알 수 없는 최상위 필드와 payload의 선택 필드는 무시한다(additionalProperties를 막지 않는다).",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/hello.ack" },
+    { "$ref": "#/$defs/heartbeat" },
+    { "$ref": "#/$defs/heartbeat.ack" },
+    { "$ref": "#/$defs/ack" },
+    { "$ref": "#/$defs/error" },
+    { "$ref": "#/$defs/trip.start" },
+    { "$ref": "#/$defs/trip.cancel" },
+    { "$ref": "#/$defs/place.upsert" },
+    { "$ref": "#/$defs/place.delete" },
+    { "$ref": "#/$defs/location.update" },
+    { "$ref": "#/$defs/sos.ack" },
+    { "$ref": "#/$defs/place.catalog" },
+    { "$ref": "#/$defs/robot.status" },
+    { "$ref": "#/$defs/sos.request" },
+    { "$ref": "#/$defs/sos.clear" }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "description": "canonical lowercase UUID v4",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "uuidOrNull": { "oneOf": [ { "$ref": "#/$defs/uuid" }, { "type": "null" } ] },
+    "placeId": { "type": "string", "pattern": "^[a-z0-9_-]{1,64}$" },
+    "placeIdOrNull": { "oneOf": [ { "$ref": "#/$defs/placeId" }, { "type": "null" } ] },
+    "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+    "lon": { "type": "number", "minimum": -180, "maximum": 180 },
+    "placeKind": {
+      "type": "string",
+      "enum": ["home", "market", "mart", "senior_center", "church", "temple", "hospital", "pharmacy", "other"]
+    },
+    "placeSource": { "type": "string", "enum": ["map_search", "map_pin", "manual_coords", "current_location"] },
+    "revision": { "type": "string", "minLength": 1, "description": "카탈로그 revision. ISO-8601 UTC 시각 문자열을 쓴다." },
+    "stringOrNull": { "type": ["string", "null"] },
+
+    "envelope": {
+      "type": "object",
+      "required": ["version", "type", "id", "sent_at_ms", "reply_to", "payload"],
+      "properties": {
+        "version": { "const": 1 },
+        "type": { "type": "string" },
+        "id": { "$ref": "#/$defs/uuid" },
+        "sent_at_ms": { "type": "integer", "minimum": 0, "description": "Unix epoch ms. 기록용. 타임아웃 계산에 쓰지 않는다." },
+        "reply_to": { "$ref": "#/$defs/uuidOrNull" },
+        "payload": { "type": "object" }
+      }
+    },
+
+    "place": {
+      "type": "object",
+      "required": ["id", "kind", "label", "lat", "lon", "radius_m", "enabled", "sort_order", "is_default_origin", "address"],
+      "properties": {
+        "id": { "$ref": "#/$defs/placeId" },
+        "kind": { "$ref": "#/$defs/placeKind" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "lat": { "$ref": "#/$defs/lat" },
+        "lon": { "$ref": "#/$defs/lon" },
+        "radius_m": { "type": "number", "minimum": 5, "maximum": 500 },
+        "enabled": { "type": "boolean" },
+        "sort_order": { "type": "integer" },
+        "is_default_origin": { "type": "boolean" },
+        "address": { "$ref": "#/$defs/stringOrNull" }
+      }
+    },
+
+    "hello": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "hello" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["app_instance_id", "app_version", "platform", "capabilities"],
+          "properties": {
+            "app_instance_id": { "$ref": "#/$defs/uuid" },
+            "app_version": { "type": "string", "minLength": 1 },
+            "platform": { "type": "string", "enum": ["android"] },
+            "capabilities": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["location.cache", "location.fresh", "place.edit"] },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+
+    "hello.ack": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "hello.ack" },
+        "reply_to": { "$ref": "#/$defs/uuid" },
+        "payload": {
+          "type": "object",
+          "required": ["session_id", "robot_id", "server_version", "heartbeat_interval_ms", "heartbeat_timeout_ms", "catalog_revision", "place_edit_enabled", "max_places"],
+          "properties": {
+            "session_id": { "$ref": "#/$defs/uuid" },
+            "robot_id": { "type": "string", "minLength": 1 },
+            "server_version": { "type": "string", "minLength": 1 },
+            "heartbeat_interval_ms": { "type": "integer", "minimum": 500 },
+            "heartbeat_timeout_ms": { "type": "integer", "minimum": 1000 },
+            "catalog_revision": { "$ref": "#/$defs/revision" },
+            "place_edit_enabled": { "type": "boolean" },
+            "max_places": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "heartbeat": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "heartbeat" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["session_id"],
+          "properties": { "session_id": { "$ref": "#/$defs/uuid" } }
+        }
+      }
+    },
+
+    "heartbeat.ack": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "heartbeat.ack" },
+        "reply_to": { "$ref": "#/$defs/uuid" },
+        "payload": {
+          "type": "object",
+          "required": ["session_id"],
+          "properties": { "session_id": { "$ref": "#/$defs/uuid" } }
+        }
+      }
+    },
+
+    "ack": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "description": "요청 접수 성공. trip.start에는 trip_id, place.upsert/place.delete에는 place_id와 catalog_revision이 추가된다.",
+      "properties": {
+        "type": { "const": "ack" },
+        "reply_to": { "$ref": "#/$defs/uuid" },
+        "payload": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "const": "accepted" },
+            "trip_id": { "$ref": "#/$defs/uuid" },
+            "place_id": { "$ref": "#/$defs/placeId" },
+            "catalog_revision": { "$ref": "#/$defs/revision" }
+          }
+        }
+      }
+    },
+
+    "error": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "error" },
+        "payload": {
+          "type": "object",
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": ["INVALID_MESSAGE", "UNSUPPORTED_TYPE", "UNSUPPORTED_VERSION", "NOT_READY", "UNKNOWN_PLACE", "INVALID_STATE", "CATALOG_CONFLICT", "PLACE_LIMIT", "PLACE_IN_USE", "PERMISSION_DENIED", "INTERNAL_ERROR"]
+            },
+            "message": { "type": "string" },
+            "retryable": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
+    "trip.start": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "trip.start" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["from_place_id", "to_place_id", "catalog_revision"],
+          "properties": {
+            "from_place_id": { "$ref": "#/$defs/placeId" },
+            "to_place_id": { "$ref": "#/$defs/placeId" },
+            "catalog_revision": { "$ref": "#/$defs/revision" }
+          }
+        }
+      }
+    },
+
+    "trip.cancel": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "trip.cancel" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["trip_id", "reason"],
+          "properties": {
+            "trip_id": { "$ref": "#/$defs/uuid" },
+            "reason": { "type": "string", "minLength": 1, "description": "예: user_request" }
+          }
+        }
+      }
+    },
+
+    "place.upsert": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "place.upsert" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["place_id", "catalog_revision", "kind", "label", "lat", "lon", "radius_m", "enabled", "sort_order", "is_default_origin", "address", "source"],
+          "properties": {
+            "place_id": { "$ref": "#/$defs/placeIdOrNull", "description": "null이면 추가, 값이 있으면 수정" },
+            "catalog_revision": { "$ref": "#/$defs/revision" },
+            "kind": { "$ref": "#/$defs/placeKind" },
+            "label": { "type": "string", "minLength": 1, "maxLength": 20 },
+            "lat": { "$ref": "#/$defs/lat" },
+            "lon": { "$ref": "#/$defs/lon" },
+            "radius_m": { "type": "number", "minimum": 5, "maximum": 500 },
+            "enabled": { "type": "boolean" },
+            "sort_order": { "type": "integer" },
+            "is_default_origin": { "type": "boolean" },
+            "address": { "$ref": "#/$defs/stringOrNull" },
+            "source": { "$ref": "#/$defs/placeSource" }
+          }
+        }
+      }
+    },
+
+    "place.delete": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "place.delete" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["place_id", "catalog_revision"],
+          "properties": {
+            "place_id": { "$ref": "#/$defs/placeId" },
+            "catalog_revision": { "$ref": "#/$defs/revision" }
+          }
+        }
+      }
+    },
+
+    "location.update": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "location.update" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["reason", "sos_id", "has_fix", "lat", "lon", "horizontal_accuracy_m", "captured_at_ms", "age_ms", "source", "failure_reason"],
+          "properties": {
+            "reason": { "type": "string", "enum": ["periodic", "sos"] },
+            "sos_id": { "$ref": "#/$defs/uuidOrNull" },
+            "has_fix": { "type": "boolean" },
+            "lat": { "oneOf": [ { "$ref": "#/$defs/lat" }, { "type": "null" } ] },
+            "lon": { "oneOf": [ { "$ref": "#/$defs/lon" }, { "type": "null" } ] },
+            "horizontal_accuracy_m": { "oneOf": [ { "type": "number", "minimum": 0 }, { "type": "null" } ] },
+            "captured_at_ms": { "oneOf": [ { "type": "integer", "minimum": 0 }, { "type": "null" } ] },
+            "age_ms": { "oneOf": [ { "type": "integer", "minimum": 0 }, { "type": "null" } ] },
+            "source": { "type": "string", "enum": ["cache", "fresh", "none"] },
+            "failure_reason": {
+              "oneOf": [ { "type": "string", "enum": ["permission_denied", "provider_disabled", "timeout", "unavailable"] }, { "type": "null" } ]
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "has_fix": { "const": true } } },
+              "then": {
+                "properties": {
+                  "lat": { "type": "number" },
+                  "lon": { "type": "number" },
+                  "captured_at_ms": { "type": "integer" },
+                  "age_ms": { "type": "integer" },
+                  "source": { "enum": ["cache", "fresh"] },
+                  "failure_reason": { "type": "null" }
+                }
+              },
+              "else": {
+                "properties": {
+                  "lat": { "type": "null" },
+                  "lon": { "type": "null" },
+                  "horizontal_accuracy_m": { "type": "null" },
+                  "captured_at_ms": { "type": "null" },
+                  "age_ms": { "type": "null" },
+                  "source": { "const": "none" },
+                  "failure_reason": { "type": "string" }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "reason": { "const": "sos" } } },
+              "then": { "properties": { "sos_id": { "$ref": "#/$defs/uuid" } } },
+              "else": { "properties": { "sos_id": { "type": "null" } } }
+            }
+          ]
+        }
+      }
+    },
+
+    "sos.ack": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "sos.ack" },
+        "reply_to": { "$ref": "#/$defs/uuid" },
+        "payload": {
+          "type": "object",
+          "required": ["sos_id", "received"],
+          "properties": {
+            "sos_id": { "$ref": "#/$defs/uuid" },
+            "received": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
+    "place.catalog": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "place.catalog" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["revision", "max_places", "default_origin_place_id", "places"],
+          "properties": {
+            "revision": { "$ref": "#/$defs/revision" },
+            "max_places": { "type": "integer", "minimum": 0 },
+            "default_origin_place_id": { "$ref": "#/$defs/placeIdOrNull" },
+            "places": { "type": "array", "items": { "$ref": "#/$defs/place" } }
+          }
+        }
+      }
+    },
+
+    "robot.status": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "robot.status" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["robot_id", "bridge_state", "mission_state", "tracking_state", "trip_id", "from_place_id", "to_place_id", "battery_percent", "last_error"],
+          "properties": {
+            "robot_id": { "type": "string", "minLength": 1 },
+            "bridge_state": { "type": "string", "enum": ["ready", "degraded", "error"] },
+            "mission_state": { "type": "string", "enum": ["idle", "starting", "active", "arrived", "cancelling", "cancelled", "error", "unknown"] },
+            "tracking_state": { "type": "string", "enum": ["unavailable", "searching", "following", "lost", "error", "unknown"] },
+            "trip_id": { "$ref": "#/$defs/uuidOrNull" },
+            "from_place_id": { "$ref": "#/$defs/placeIdOrNull" },
+            "to_place_id": { "$ref": "#/$defs/placeIdOrNull" },
+            "battery_percent": { "oneOf": [ { "type": "number", "minimum": 0, "maximum": 100 }, { "type": "null" } ] },
+            "last_error": { "$ref": "#/$defs/stringOrNull" }
+          }
+        }
+      }
+    },
+
+    "sos.request": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "sos.request" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["sos_id", "reason", "severity", "trip_id"],
+          "properties": {
+            "sos_id": { "$ref": "#/$defs/uuid" },
+            "reason": { "type": "string", "enum": ["tracking_lost", "stuck", "low_battery", "manual", "unknown"] },
+            "severity": { "type": "string", "enum": ["critical", "warning"] },
+            "trip_id": { "$ref": "#/$defs/uuidOrNull" }
+          }
+        }
+      }
+    },
+
+    "sos.clear": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "properties": {
+        "type": { "const": "sos.clear" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["sos_id", "resolution"],
+          "properties": {
+            "sos_id": { "$ref": "#/$defs/uuid" },
+            "resolution": { "type": "string", "enum": ["tracking_recovered", "handled", "cancelled", "unknown"] }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "type": "error",
+  "id": "f177b5a1-b7e5-4cba-89a2-014c66f553af",
+  "sent_at_ms": 1787792400500,
+  "reply_to": "e87864c5-3c72-42f8-9565-cf9219aa7cf2",
+  "payload": {
+    "code": "UNKNOWN_PLACE",
+    "message": "Unknown destination place_id",
+    "retryable": false
+  }
+}

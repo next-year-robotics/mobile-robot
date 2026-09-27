@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "type": "sos.request",
+  "id": "4ccb97ee-a8bf-40de-a211-5254059694ad",
+  "sent_at_ms": 1787792420000,
+  "reply_to": null,
+  "payload": {
+    "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c",
+    "reason": "tracking_lost",
+    "severity": "critical",
+    "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca"
+  }
+}

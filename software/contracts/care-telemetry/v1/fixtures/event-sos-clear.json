@@ -1,0 +1,11 @@
+{
+  "ts_ms": 1790000030000,
+  "kind": "sos.clear",
+  "severity": "info",
+  "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+  "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c",
+  "message": "어르신을 다시 찾았어요",
+  "data": {
+    "resolution": "tracking_recovered"
+  }
+}

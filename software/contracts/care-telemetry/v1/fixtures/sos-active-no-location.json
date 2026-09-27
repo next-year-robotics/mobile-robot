@@ -1,0 +1,9 @@
+{
+  "started_at_ms": 1790000000000,
+  "updated_at_ms": 1790000000000,
+  "reason": "stuck",
+  "severity": "warning",
+  "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+  "app_received": false,
+  "location": null
+}

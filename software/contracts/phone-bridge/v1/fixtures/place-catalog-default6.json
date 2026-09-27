@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "type": "place.catalog",
+  "id": "5c0d9e8f-7a6b-4c5d-9e0f-1a2b3c4d5e6f",
+  "sent_at_ms": 1787792400100,
+  "reply_to": null,
+  "payload": {
+    "revision": "2026-08-27T12:00:00Z",
+    "max_places": 12,
+    "default_origin_place_id": "place_home",
+    "places": [
+      {
+        "id": "place_home",
+        "kind": "home",
+        "label": "집",
+        "lat": 36.1234,
+        "lon": 128.5678,
+        "radius_m": 20,
+        "enabled": true,
+        "sort_order": 10,
+        "is_default_origin": true,
+        "address": "경상북도 …"
+      },
+      {
+        "id": "place_market",
+        "kind": "market",
+        "label": "시장",
+        "lat": 36.1251,
+        "lon": 128.5702,
+        "radius_m": 30,
+        "enabled": true,
+        "sort_order": 20,
+        "is_default_origin": false,
+        "address": null
+      },
+      {
+        "id": "place_mart",
+        "kind": "mart",
+        "label": "마트",
+        "lat": 36.1262,
+        "lon": 128.5719,
+        "radius_m": 30,
+        "enabled": true,
+        "sort_order": 30,
+        "is_default_origin": false,
+        "address": null
+      },
+      {
+        "id": "place_senior_center",
+        "kind": "senior_center",
+        "label": "노인정",
+        "lat": 36.1277,
+        "lon": 128.5731,
+        "radius_m": 25,
+        "enabled": true,
+        "sort_order": 40,
+        "is_default_origin": false,
+        "address": "경상북도 …"
+      },
+      {
+        "id": "place_church",
+        "kind": "church",
+        "label": "교회",
+        "lat": 36.129,
+        "lon": 128.5688,
+        "radius_m": 30,
+        "enabled": true,
+        "sort_order": 50,
+        "is_default_origin": false,
+        "address": null
+      },
+      {
+        "id": "place_temple",
+        "kind": "temple",
+        "label": "절",
+        "lat": 36.1215,
+        "lon": 128.575,
+        "radius_m": 40,
+        "enabled": false,
+        "sort_order": 60,
+        "is_default_origin": false,
+        "address": null
+      }
+    ]
+  }
+}

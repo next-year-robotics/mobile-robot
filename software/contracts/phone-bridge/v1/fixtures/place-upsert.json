@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "type": "place.upsert",
+  "id": "6d1f3f1e-5f6a-4a0e-9f6b-0a2f0a3f2b11",
+  "sent_at_ms": 1787792500000,
+  "reply_to": null,
+  "payload": {
+    "place_id": null,
+    "catalog_revision": "2026-08-27T12:00:00Z",
+    "kind": "senior_center",
+    "label": "노인정",
+    "lat": 36.1277,
+    "lon": 128.5731,
+    "radius_m": 25,
+    "enabled": true,
+    "sort_order": 40,
+    "is_default_origin": false,
+    "address": "경상북도 …",
+    "source": "map_search"
+  }
+}

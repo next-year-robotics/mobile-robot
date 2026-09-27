@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "type": "place.delete",
+  "id": "9e7c9a20-3c4b-4c1e-9a2d-71b0f9a2c4d8",
+  "sent_at_ms": 1787792510000,
+  "reply_to": null,
+  "payload": {
+    "place_id": "place_temple",
+    "catalog_revision": "2026-08-27T12:05:00Z"
+  }
+}

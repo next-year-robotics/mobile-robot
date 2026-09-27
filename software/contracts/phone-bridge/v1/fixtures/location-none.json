@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "type": "location.update",
+  "id": "c1e35838-37e2-4789-88d5-e228120b09b2",
+  "sent_at_ms": 1787792420000,
+  "reply_to": null,
+  "payload": {
+    "reason": "sos",
+    "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c",
+    "has_fix": false,
+    "lat": null,
+    "lon": null,
+    "horizontal_accuracy_m": null,
+    "captured_at_ms": null,
+    "age_ms": null,
+    "source": "none",
+    "failure_reason": "provider_disabled"
+  }
+}

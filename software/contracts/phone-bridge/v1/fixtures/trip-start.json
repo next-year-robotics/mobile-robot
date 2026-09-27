@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "type": "trip.start",
+  "id": "e87864c5-3c72-42f8-9565-cf9219aa7cf2",
+  "sent_at_ms": 1787792410000,
+  "reply_to": null,
+  "payload": {
+    "from_place_id": "place_home",
+    "to_place_id": "place_market",
+    "catalog_revision": "2026-08-27T12:00:00Z"
+  }
+}

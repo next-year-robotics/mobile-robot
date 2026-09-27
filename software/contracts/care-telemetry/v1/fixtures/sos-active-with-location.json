@@ -1,0 +1,16 @@
+{
+  "started_at_ms": 1790000000000,
+  "updated_at_ms": 1790000012000,
+  "reason": "tracking_lost",
+  "severity": "critical",
+  "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+  "app_received": true,
+  "location": {
+    "lat": 36.1234,
+    "lon": 128.5678,
+    "accuracy_m": 4.2,
+    "captured_at_ms": 1789999999200,
+    "source": "cache",
+    "low_confidence": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "type": "sos.ack",
+  "id": "584bb007-a09d-4389-9e90-511490b2d82c",
+  "sent_at_ms": 1787792420100,
+  "reply_to": "4ccb97ee-a8bf-40de-a211-5254059694ad",
+  "payload": {
+    "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c",
+    "received": true
+  }
+}

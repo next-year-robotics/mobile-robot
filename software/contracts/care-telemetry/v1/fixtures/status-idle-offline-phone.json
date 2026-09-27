@@ -1,0 +1,20 @@
+{
+  "updated_at_ms": 1790000005000,
+  "agent": {
+    "version": "0.1.0",
+    "uptime_s": 3605,
+    "queue_len": 2
+  },
+  "bridge_state": "degraded",
+  "mission_state": "idle",
+  "tracking_state": "unavailable",
+  "trip_id": null,
+  "from_place_id": null,
+  "to_place_id": null,
+  "battery_percent": null,
+  "last_error": "앱 연결이 끊어졌습니다",
+  "phone_link": {
+    "connected": false,
+    "last_seen_ms": 1789999980000
+  }
+}

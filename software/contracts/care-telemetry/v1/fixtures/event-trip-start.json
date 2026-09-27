@@ -1,0 +1,12 @@
+{
+  "ts_ms": 1789999900000,
+  "kind": "trip.start",
+  "severity": "info",
+  "trip_id": "bbef019a-dd3a-437e-8f5c-388913ae9eca",
+  "sos_id": null,
+  "message": "집에서 시장으로 출발했어요",
+  "data": {
+    "from_place_id": "place_home",
+    "to_place_id": "place_market"
+  }
+}

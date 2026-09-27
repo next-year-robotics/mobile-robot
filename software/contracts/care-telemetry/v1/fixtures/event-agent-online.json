@@ -1,0 +1,11 @@
+{
+  "ts_ms": 1789996400000,
+  "kind": "agent.online",
+  "severity": "info",
+  "trip_id": null,
+  "sos_id": null,
+  "message": "로봇이 온라인이 되었어요",
+  "data": {
+    "version": "0.1.0"
+  }
+}
