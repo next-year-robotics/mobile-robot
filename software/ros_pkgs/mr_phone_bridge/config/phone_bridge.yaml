@@ -1,0 +1,22 @@
+# mr_phone_bridge 파라미터. 값의 근거는 software/contracts/phone-bridge/v1/PROTOCOL.md.
+# robot_id·port를 바꾸면 config/avahi/mr-phone-bridge.service도 같이 고친다.
+mr_phone_bridge:
+  ros__parameters:
+    robot_id: "mr-001"
+    bind_host: "0.0.0.0"          # ufw로 핫스팟 인터페이스만 연다(README)
+    port: 8765
+    path: "/bridge/v1"
+    places_path: "~/ros2_ws/config/places.yaml"
+    max_places: 12
+    place_edit_enabled: true
+    heartbeat_interval_ms: 2000
+    heartbeat_timeout_ms: 10000
+    status_period_s: 2.0
+    sos_retry_interval_s: 2.0
+    sos_max_retries: 3
+    dedupe_ttl_s: 600.0
+    max_frame_bytes: 16384
+    # robot.status 채우기(PROTOCOL.md 7.3). mission은 2 s 주기라 3번 놓치면 낡은 것으로 본다.
+    app_status_stale_s: 6.0
+    marker_stale_s: 1.0
+    marker_track_topic: "/marker_track"   # mr_aruco_msgs가 없으면 구독하지 않는다
