@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>mr_care_telemetry</name>
+  <version>0.1.0</version>
+  <description>ROS 2 상태·이벤트를 요약해 Firebase RTDB(care-telemetry/1)에 쓰는 에이전트. REST + 서비스 계정 JWT, SQLite 오프라인 큐.</description>
+  <maintainer email="seongho06@khu.ac.kr">emjdp</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>mr_care_msgs</depend>
+  <depend>mr_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <exec_depend>python3-cryptography</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-jsonschema</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,24 @@
+# mr_care_telemetry systemd 유닛(RPi5). 브리지·베이스와 별도로 돈다. 설치:
+#   sudo cp mr-care-telemetry.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#   sudo systemctl enable --now mr-care-telemetry
+# 서비스 계정 파일(~/.config/mr_care_telemetry/service-account.json, chmod 600)이 없어도 죽지 않고
+# 이벤트를 SQLite 큐에 쌓으며 기다린다. 파일을 넣으면 재시작 없이 보내기 시작한다.
+[Unit]
+Description=mr_care_telemetry (care-telemetry/1 -> Firebase RTDB)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=emjdpi
+Environment=ROS_DOMAIN_ID=0
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -c 'source /opt/ros/jazzy/setup.bash && source /home/emjdpi/ros2_ws/install/setup.bash && exec ros2 run mr_care_telemetry care_telemetry --ros-args --params-file /home/emjdpi/ros2_ws/install/mr_care_telemetry/share/mr_care_telemetry/config/care_telemetry.yaml'
+KillSignal=SIGINT
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=10
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
