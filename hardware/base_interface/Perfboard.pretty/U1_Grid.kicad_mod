@@ -1,0 +1,129 @@
+(footprint "U1_Grid"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "U1"
+		(at 2.54 -8.46 0)
+		(layer "F.SilkS")
+		(uuid "f12237d6-9140-4a22-b333-8c1bb52e0380")
+		(effects
+			(font
+				(size 0.95 0.95)
+				(thickness 0.13)
+			)
+		)
+	)
+	(property "Value" "R-78E5.0-1.0"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "3e6e23ed-e778-4e09-8753-e046188960ba")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "7cf3856d-a276-44ba-afb3-a05ced73d0e0")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "2e365081-6cf2-43a2-b83a-bba58e081d39")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -3.26 -7.36)
+		(end 8.339999 -7.36)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "6e0536b1-2eb3-40b2-845f-9b848d2c3da6")
+	)
+	(fp_line
+		(start -3.26 1.14)
+		(end -3.26 -7.36)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "23271610-8414-48b7-9163-9a1eb6b77272")
+	)
+	(fp_line
+		(start 8.339999 -7.36)
+		(end 8.339999 1.14)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "a081cb91-7073-4b72-b50c-4c7b28c459e9")
+	)
+	(fp_line
+		(start 8.339999 1.14)
+		(end -3.26 1.14)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "8b147c56-1d45-4725-9430-fcc692b5819e")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(thermal_bridge_angle 45)
+		(uuid "a5f2d0ca-11e8-4329-b902-7bd63ef4cc25")
+	)
+	(pad "2" thru_hole circle
+		(at 2.54 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "bd28b6db-124e-465a-ae1f-4310da6cee67")
+	)
+	(pad "3" thru_hole circle
+		(at 5.079999 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "04cda7de-16b7-4316-a298-e8973fe44c5a")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Converter_DCDC.3dshapes/Converter_DCDC_RECOM_R-78E-0.5_THT.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

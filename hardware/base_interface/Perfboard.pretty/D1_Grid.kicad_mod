@@ -1,0 +1,121 @@
+(footprint "D1_Grid"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "D1"
+		(at -7.62 -3.7 0)
+		(layer "F.SilkS")
+		(uuid "288c9da7-1645-4337-9172-23ea129feea9")
+		(effects
+			(font
+				(size 0.95 0.95)
+				(thickness 0.13)
+			)
+		)
+	)
+	(property "Value" "SR540"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "65f4390e-be7a-477b-84d4-3bb2283a4a42")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "1de3bbb0-0254-481a-95ad-41bdfbd1368b")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "bb788cd8-f8cd-46fc-a117-975b17ceac39")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -12.37 -2.6)
+		(end -2.87 -2.6)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "f0ee2786-b20a-479f-b1db-821d985d6b11")
+	)
+	(fp_line
+		(start -12.37 2.6)
+		(end -12.37 -2.6)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "91d6417b-5c19-4d32-aabd-1ae53e3881e8")
+	)
+	(fp_line
+		(start -2.87 -2.6)
+		(end -2.87 2.6)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "aa7dde99-1376-40ad-840c-6b936505bdd0")
+	)
+	(fp_line
+		(start -2.87 2.6)
+		(end -12.37 2.6)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "fa6541ff-9da6-4746-b7c9-8fa26d61eb51")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(thermal_bridge_angle 45)
+		(uuid "ff0cc2a5-e882-4750-94db-280f8d90dfda")
+	)
+	(pad "2" thru_hole circle
+		(at -15.24 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "d669728f-267a-4dde-a3ac-1d3214450fa9")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Diode_THT.3dshapes/D_DO-201AD_P15.24mm_Horizontal.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 -180)
+		)
+	)
+)

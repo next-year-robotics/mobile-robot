@@ -22,3 +22,11 @@ software/ros_pkgs/mr_base/test
 /*.deb
 hardware/mobile_base/cad/__cadgen__/
 hardware/mobile_base/cad/.*.step.glb
+
+# KiCad per-user and backup files
+*.kicad_prl
+*-backups/
+fp-info-cache
+\#auto_saved_files#
+~*.lck
+_autosave-*

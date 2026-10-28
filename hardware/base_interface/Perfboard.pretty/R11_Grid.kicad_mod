@@ -1,0 +1,121 @@
+(footprint "R11_Grid"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "R11"
+		(at 0 -0.44 0)
+		(layer "F.SilkS")
+		(uuid "c15f9d8b-8563-4e2c-9822-ca6772e6bb6d")
+		(effects
+			(font
+				(size 0.95 0.95)
+				(thickness 0.13)
+			)
+		)
+	)
+	(property "Value" "10k"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "e0b61063-5ded-4e31-8b2f-0c3fe352d412")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "3ce40af9-39d3-4b48-b084-a9c0d4183f52")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "54a8d48c-0f15-45eb-9de5-a999dd08f3fc")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -1.25 0.66)
+		(end 1.25 0.66)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "1412629a-a8e5-4855-858d-d3fc52580cb6")
+	)
+	(fp_line
+		(start -1.25 6.96)
+		(end -1.25 0.66)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "f66b449e-b9c9-49c5-9c03-4c70c25dc2ee")
+	)
+	(fp_line
+		(start 1.25 0.66)
+		(end 1.25 6.96)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "4bc45590-b9a7-4773-b146-05769b3af807")
+	)
+	(fp_line
+		(start 1.25 6.96)
+		(end -1.25 6.96)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "04c5c358-79c8-4e3c-844f-f38b2e079c5b")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(thermal_bridge_angle 45)
+		(uuid "41eccec8-aa1c-4452-87ce-8c2527b6ecde")
+	)
+	(pad "2" thru_hole circle
+		(at 0 7.62)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "a71889ea-0618-47a7-af4a-a645a87d7502")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 90)
+		)
+	)
+)
