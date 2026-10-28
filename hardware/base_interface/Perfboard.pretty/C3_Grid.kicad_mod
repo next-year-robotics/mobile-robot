@@ -1,0 +1,121 @@
+(footprint "C3_Grid"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "C3"
+		(at 0 -2.33 0)
+		(layer "F.SilkS")
+		(uuid "00eae007-bf69-43d8-9f8e-dc7714609212")
+		(effects
+			(font
+				(size 0.95 0.95)
+				(thickness 0.13)
+			)
+		)
+	)
+	(property "Value" "100nF 50V"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "cf0533e9-98bc-4fcd-a499-0a844a4d72b5")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "c24faac9-2a2a-4df0-a4be-9eac7c4ba036")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "a3492b08-f9ac-4a87-adc2-c7baa48d59bb")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -1.25 -1.23)
+		(end 1.25 -1.23)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "e9b8e013-2bba-42e6-8258-87ca49f33764")
+	)
+	(fp_line
+		(start -1.25 3.77)
+		(end -1.25 -1.23)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "736668b7-afd7-437c-8f53-b0ecda07a092")
+	)
+	(fp_line
+		(start 1.25 -1.23)
+		(end 1.25 3.77)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "1b91c520-9e52-4f11-868d-2ce31b27b687")
+	)
+	(fp_line
+		(start 1.25 3.77)
+		(end -1.25 3.77)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "c799d5c7-1584-4787-a3f9-46bb197c444a")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(thermal_bridge_angle 45)
+		(uuid "7aba3cec-f9c1-4197-a17c-51c6400a6c03")
+	)
+	(pad "2" thru_hole circle
+		(at 0 2.54)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "43afaccc-76d3-4698-a22f-186bf6b56225")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D5.0mm_W2.5mm_P5.00mm.step"
+		(offset
+			(xyz 0 1.23 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 90)
+		)
+	)
+)

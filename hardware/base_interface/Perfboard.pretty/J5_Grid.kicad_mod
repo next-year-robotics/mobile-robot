@@ -1,0 +1,145 @@
+(footprint "J5_Grid"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "J5"
+		(at 0 -3.469999 0)
+		(layer "F.SilkS")
+		(uuid "dfe961e3-db2c-45a9-8878-24ef29ac39d3")
+		(effects
+			(font
+				(size 0.95 0.95)
+				(thickness 0.13)
+			)
+		)
+	)
+	(property "Value" "ENC_RIGHT_XH5"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "c0c74241-2d1f-4357-be75-be8503fb96be")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "647d2eed-9279-4dc2-a92d-856137e9bd1a")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "5a6ec145-653f-4d05-a68b-e78ab1af76e1")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -3.4 -2.369999)
+		(end 2.35 -2.369999)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "bfff320e-fcde-41c1-a551-2ee5f753c6c0")
+	)
+	(fp_line
+		(start -3.4 12.530001)
+		(end -3.4 -2.369999)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "b529380e-174e-44c7-9378-59860820b559")
+	)
+	(fp_line
+		(start 2.35 -2.369999)
+		(end 2.35 12.530001)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "d50ee44c-2008-4317-887e-bcba9f2cc27e")
+	)
+	(fp_line
+		(start 2.35 12.530001)
+		(end -3.4 12.530001)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "fcfe5564-3773-42c9-b427-874189f15106")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(thermal_bridge_angle 45)
+		(uuid "e5073b55-38a7-47d3-931e-814ea1b2c7f1")
+	)
+	(pad "2" thru_hole circle
+		(at 0 2.540001)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "15cee9af-d881-48aa-af5d-4681a2b7833f")
+	)
+	(pad "3" thru_hole circle
+		(at 0 5.080001)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "bcdaaac3-dda9-4da5-a7ea-032402d54d5a")
+	)
+	(pad "4" thru_hole circle
+		(at 0 7.620001)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "d4b8e3e5-32c7-479d-86bf-b18e504a0f35")
+	)
+	(pad "5" thru_hole circle
+		(at 0 10.160001)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "96d265ca-2cec-47eb-9a74-8df7c2d2d764")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Connector_JST.3dshapes/JST_XH_B5B-XH-A_1x05_P2.50mm_Vertical.step"
+		(offset
+			(xyz 0 -0.08 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 90)
+		)
+	)
+)

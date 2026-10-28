@@ -1,0 +1,121 @@
+(footprint "J10_Grid"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "J10"
+		(at 0 -3.53 0)
+		(layer "F.SilkS")
+		(uuid "a5f4eec2-73f5-4ccd-b270-57d3e1e4586e")
+		(effects
+			(font
+				(size 0.95 0.95)
+				(thickness 0.13)
+			)
+		)
+	)
+	(property "Value" "ADC_XH2"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "8636114f-4b52-48f8-8dbd-c82f80b83f2a")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "6649e2b7-cbc8-4ede-828f-27b23d5e551a")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "cc3eda6d-8dde-4c11-82ef-29e370cd9ac3")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -3.4 -2.43)
+		(end 2.35 -2.43)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "ff870f25-fcac-4864-8662-6bad5d5fcd14")
+	)
+	(fp_line
+		(start -3.4 4.97)
+		(end -3.4 -2.43)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "612f1fb4-35db-4c9e-8bc4-8c8bad077b1e")
+	)
+	(fp_line
+		(start 2.35 -2.43)
+		(end 2.35 4.97)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "57806822-a9bb-46d8-9737-ff9eb67e8728")
+	)
+	(fp_line
+		(start 2.35 4.97)
+		(end -3.4 4.97)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "F.SilkS")
+		(uuid "6b877ee3-2483-43ce-8b0c-3bb1cb23faaa")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(thermal_bridge_angle 45)
+		(uuid "b3c35c63-a9e7-4a98-9408-e48f2ff0136d")
+	)
+	(pad "2" thru_hole circle
+		(at 0 2.54)
+		(size 1.8 1.8)
+		(drill 0.95)
+		(layers "*.Cu" "B.Mask")
+		(remove_unused_layers no)
+		(uuid "2e125aeb-343e-41c0-b54f-74bc459824f9")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Connector_JST.3dshapes/JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical.step"
+		(offset
+			(xyz 0 -0.02 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 90)
+		)
+	)
+)
