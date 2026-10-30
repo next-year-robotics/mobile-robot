@@ -5,7 +5,8 @@
   (그러면 tracking_state는 unavailable).
 - /odom (nav_msgs/Odometry) 20 Hz: mission의 정지 확인용.
 - /demo/cmd (std_msgs/String): lost | found | sos [reason] | clear [resolution]
-  sos·clear는 아직 없는 safety 노드 대신 /safety/sos_request·/safety/sos_clear를 낸다.
+  sos·clear는 /safety/sos_request·/safety/sos_clear를 직접 낸다(SOS 화면 시험용). mission도 lost가 10 s 이어지면
+  스스로 SOS를 낸다(M3, 2026-09-27).
 """
 import signal
 import uuid

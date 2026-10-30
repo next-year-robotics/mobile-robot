@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 BRIDGE_STATES = ('ready', 'degraded', 'error')
 MISSION_STATES = ('idle', 'starting', 'active', 'arrived', 'cancelling', 'cancelled', 'error', 'unknown')
-TRACKING_STATES = ('unavailable', 'searching', 'following', 'lost', 'error', 'unknown')
+TRACKING_STATES = ('unavailable', 'searching', 'following', 'lost', 'idle', 'error', 'unknown')
 # 주행이 진행 중인 상태. 이때 trip.start는 INVALID_STATE, 쓰는 장소는 삭제·이동 금지.
 ACTIVE_MISSION_STATES = frozenset({'starting', 'active', 'cancelling'})
 # 새 trip.start를 받을 수 있는 상태. unknown(mission 노드 없음)은 NOT_READY.

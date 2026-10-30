@@ -3,8 +3,10 @@
 # RPi5 없이 앱·대시보드를 실제 브리지·mission·텔레메트리에 붙여 본다. 자세한 것은 같은 폴더 README.md.
 #
 #   demo.sh build                                   스크래치 워크스페이스에 빌드(처음 한 번, 코드 바꾼 뒤)
-#   demo.sh start [--emulator HOST:PORT | --no-telemetry] [--dashboard]
-#   demo.sh ctl lost|found|sos [reason]|clear [resolution]
+#   demo.sh start [--emulator HOST:PORT | --no-telemetry] [--dashboard] [--fake-app]
+#   demo.sh ctl lost|found|sos [reason]|clear [resolution]        가짜 로봇(마커·SOS 직접 발행)
+#   demo.sh ctl trip start <출발> <도착> | trip cancel             가짜 앱(--fake-app, 포트 8765 아닐 때만)
+#   demo.sh ctl app status|ack yes|no|late <s>|location <모드>|drop close|abort|silent [s]|connect|wait <조건> [s]|mark|log
 #   demo.sh status | stop
 #   demo.sh access list | grant <uid> [dev|guardian] | revoke <uid>
 #
@@ -20,7 +22,7 @@ SA=${MR_SERVICE_ACCOUNT:-$HOME/.config/mr_care_telemetry/service-account.json}
 ARUCO_MSGS=${MR_ARUCO_MSGS:-$HOME/dev/mobile-robot/software/ros_pkgs/mr_aruco_msgs}
 DASHBOARD=${MR_DASHBOARD_DIR:-$HOME/dev/senior-care-dashboard/web}
 ADB=${ADB:-$(command -v adb || echo "$HOME/Android/Sdk/platform-tools/adb")}
-NAMES="bridge telemetry mission fake_robot dashboard"                # 끄는 순서
+NAMES="fake_app bridge telemetry mission fake_robot dashboard"       # 끄는 순서
 
 die() { echo "demo: $*" >&2; exit 1; }
 
@@ -60,16 +62,19 @@ cmd_build() {
 }
 
 cmd_start() {
-  local telemetry=real emulator="" dashboard=0
+  local telemetry=real emulator="" dashboard=0 fake_app=0
   while [ $# -gt 0 ]; do
     case $1 in
       --emulator) telemetry=emulator; emulator=$2; shift ;;
       --no-telemetry) telemetry=off ;;
       --dashboard) dashboard=1 ;;
+      --fake-app) fake_app=1 ;;
       *) die "모르는 옵션: $1" ;;
     esac
     shift
   done
+  # 브리지는 앱 세션을 하나만 둔다. 기본 포트에 가짜 앱을 붙이면 진짜 폰(다른 데모)의 세션을 밀어낸다.
+  [ $fake_app = 1 ] && [ "$PORT" = 8765 ] && die "--fake-app은 기본 포트 8765에서 쓰지 않는다. MR_DEMO_PORT를 바꾼다(예: 18865)"
   for n in $NAMES; do alive "$n" && die "이미 실행 중($n). 먼저: $0 stop"; done
   ss -ltn | grep -q ":$PORT " && die "포트 $PORT 사용 중(mock bridge가 떠 있나?)"
   ros_env
@@ -104,7 +109,13 @@ write_seed(Path('$STATE/places.yaml'), *seed_places('default6'))" || die "places
     local emu=0; [ "$telemetry" = emulator ] && emu=1
     launch dashboard bash -c "cd '$DASHBOARD' && VITE_USE_EMULATORS=$emu exec npm run dev"
   fi
-  if phone; then "$ADB" reverse "tcp:$PORT" "tcp:$PORT" > /dev/null && echo "폰: adb reverse tcp:$PORT 설정"; fi
+  if [ $fake_app = 1 ]; then
+    launch fake_app python3 "$HERE/fake_app.py" serve --url "ws://127.0.0.1:$PORT/bridge/v1" --state "$STATE"
+    python3 "$HERE/fake_app.py" ctl --state "$STATE" wait connected=true 15 > /dev/null \
+      || die "가짜 앱이 브리지에 붙지 못했다(로그: $STATE/fake_app.log)"
+  elif phone; then
+    "$ADB" reverse "tcp:$PORT" "tcp:$PORT" > /dev/null && echo "폰: adb reverse tcp:$PORT 설정"
+  fi
 
   echo "데모 스택 실행 중 (ROS_DOMAIN_ID=$DOMAIN, 상태·로그: $STATE)"
   echo "  브리지     ws://127.0.0.1:$PORT/bridge/v1  (앱: 설정 길게 누르기 → 로봇 주소 127.0.0.1, 포트 $PORT)"
@@ -114,6 +125,7 @@ write_seed(Path('$STATE/places.yaml'), *seed_places('default6'))" || die "places
     off) echo "  텔레메트리 끔" ;;
   esac
   [ $dashboard = 1 ] && echo "  대시보드   http://localhost:5173  (127.0.0.1이 아니라 localhost: Firebase 허용 도메인)"
+  [ $fake_app = 1 ] && echo "  가짜 앱    붙음(세션 1개를 차지한다). $0 ctl trip start 집 마트 | trip cancel | app status"
   echo "  조작       $0 ctl sos | clear | lost | found      끄기: $0 stop"
 }
 
@@ -147,7 +159,13 @@ cmd_status() {
 }
 
 cmd_ctl() {
-  [ $# -ge 1 ] || die "사용: $0 ctl lost|found|sos [tracking_lost|stuck|low_battery|manual]|clear [tracking_recovered|handled|cancelled]"
+  [ $# -ge 1 ] || die "사용: $0 ctl lost|found|sos [tracking_lost|stuck|low_battery|manual]|clear [tracking_recovered|handled|cancelled] | trip … | app …"
+  case $1 in
+    trip|app)
+      alive fake_app || die "가짜 앱이 실행 중이 아니다($0 start --fake-app)"
+      [ "$1" = app ] && shift
+      exec python3 "$HERE/fake_app.py" ctl --state "$STATE" "$@" ;;
+  esac
   alive fake_robot || die "데모가 실행 중이 아니다"
   ros_env
   timeout 15 ros2 topic pub --once -w 1 /demo/cmd std_msgs/msg/String "{data: '$*'}" > /dev/null \
@@ -161,5 +179,5 @@ case ${1:-} in
   status) cmd_status ;;
   ctl) shift; cmd_ctl "$@" ;;
   access) shift; python3 "$HERE/access.py" "$@" ;;
-  *) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
