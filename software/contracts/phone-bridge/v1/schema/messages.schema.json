@@ -356,7 +356,7 @@
             "robot_id": { "type": "string", "minLength": 1 },
             "bridge_state": { "type": "string", "enum": ["ready", "degraded", "error"] },
             "mission_state": { "type": "string", "enum": ["idle", "starting", "active", "arrived", "cancelling", "cancelled", "error", "unknown"] },
-            "tracking_state": { "type": "string", "enum": ["unavailable", "searching", "following", "lost", "error", "unknown"] },
+            "tracking_state": { "type": "string", "enum": ["unavailable", "searching", "following", "lost", "idle", "error", "unknown"] },
             "trip_id": { "$ref": "#/$defs/uuidOrNull" },
             "from_place_id": { "$ref": "#/$defs/placeIdOrNull" },
             "to_place_id": { "$ref": "#/$defs/placeIdOrNull" },

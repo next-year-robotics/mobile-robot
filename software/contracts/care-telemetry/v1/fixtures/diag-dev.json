@@ -1,0 +1,12 @@
+{
+  "updated_at_ms": 1790000000000,
+  "topics": {
+    "base": { "status": { "last_seen_ms": 1789999999900, "hz": 9.8 } },
+    "joint_states": { "last_seen_ms": 1789999999950, "hz": 49.6 },
+    "marker_track": { "last_seen_ms": 1789999990000, "hz": 0 },
+    "robot": { "app_status": { "last_seen_ms": 0, "hz": 0 } }
+  },
+  "recent_errors": [
+    { "ts_ms": 1789999000000, "source": "telemetry", "error": "PUT robots/mr-001/status: timed out" }
+  ]
+}
