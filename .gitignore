@@ -14,14 +14,22 @@ firmware/base_controller/micro_ros/library_generation/extra_packages/
 firmware/base_controller/micro_ros/README.md
 firmware/base_controller/test
 software/ros_pkgs/mr_base/test
+/output/pdf
 
 # Repository-local generated and tool artifacts
 /generated/
+/install/
 /log/
+/software/ros_pkgs/install/
+/software/ros_pkgs/log/
 /root/
 /*.deb
 hardware/mobile_base/cad/__cadgen__/
 hardware/mobile_base/cad/.*.step.glb
+
+# Local development artifacts
+/.vscode/
+tmp/
 
 # KiCad per-user and backup files
 *.kicad_prl
