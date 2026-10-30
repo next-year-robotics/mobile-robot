@@ -112,7 +112,7 @@ cp $(find firmware/mcu_ws -path "*rmw_microxrcedds_c/config.h" | head -1) \
 # 런타임까지 내려간다.
 grep -q "define RMW_UXRCE_TRANSPORT_CUSTOM" $BASE_PATH/libmicroros/rmw_microxrcedds_config.h
 grep -q "undef RMW_UXRCE_ALLOW_DYNAMIC_ALLOCATIONS" $BASE_PATH/libmicroros/rmw_microxrcedds_config.h
-grep -q "define RMW_UXRCE_MAX_PUBLISHERS 2" $BASE_PATH/libmicroros/rmw_microxrcedds_config.h
+grep -q "define RMW_UXRCE_MAX_PUBLISHERS 3" $BASE_PATH/libmicroros/rmw_microxrcedds_config.h
 grep -q "define RMW_UXRCE_MAX_SUBSCRIPTIONS 1" $BASE_PATH/libmicroros/rmw_microxrcedds_config.h
 grep -q "define RMW_UXRCE_MAX_HISTORY 1" $BASE_PATH/libmicroros/rmw_microxrcedds_config.h
 echo "rmw 설정 반영 확인 통과"

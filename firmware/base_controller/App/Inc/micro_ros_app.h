@@ -43,6 +43,13 @@ typedef struct
   uint32_t base_status_count;
   uint32_t base_status_fail_count;
 
+  /* `/imu/data_raw`. 새 seq마다 한 번 발행한다. */
+  uint32_t imu_count;
+  uint32_t imu_fail_count;
+  uint32_t imu_held_count;          /* bias가 아직 없어 내보내지 않은 표본 */
+  uint32_t imu_stale_count;         /* IMU_MAX_AGE_MS를 넘긴 표본 */
+  uint32_t imu_skipped_count;       /* 읽기 전에 덮인 표본 (seq 차이 - 1의 합) */
+
   /* micro-ROS 전용 pool (static_pool.h). `pool_free_min`이 안정화되고
      `pool_alloc_fail`이 0이면 누수가 없다. */
   uint32_t pool_capacity;

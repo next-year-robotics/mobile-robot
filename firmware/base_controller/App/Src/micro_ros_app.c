@@ -12,6 +12,7 @@
 #include "base_config.h"
 #include "base_kinematics.h"
 #include "control_types.h"
+#include "imu_types.h"
 #include "main.h"
 #include "motor_safety.h"
 #include "platform_stm32.h"
@@ -30,6 +31,7 @@
 
 #include <geometry_msgs/msg/twist_stamped.h>
 #include <mr_msgs/msg/base_status.h>
+#include <sensor_msgs/msg/imu.h>
 #include <sensor_msgs/msg/joint_state.h>
 
 #include <stdlib.h>
@@ -40,6 +42,7 @@
 #define TOPIC_CMD_VEL           "/cmd_vel"
 #define TOPIC_JOINT_STATES      "/joint_states"
 #define TOPIC_BASE_STATUS       "/base/status"
+#define TOPIC_IMU_DATA_RAW      "/imu/data_raw"
 
 #define NS_PER_MS               1000000LL
 #define NS_PER_S                1000000000LL
@@ -257,6 +260,10 @@ static double s_joint_velocity[2];
 static mr_msgs__msg__BaseStatus s_base_status;
 static char s_base_status_frame_id[1];
 
+/* `/imu/data_raw`. 고정 길이 배열뿐이고 가변 길이는 frame_id 하나다. */
+static sensor_msgs__msg__Imu s_imu;
+static char s_imu_frame_id[sizeof(IMU_FRAME_ID)];
+
 /* `/cmd_vel`. frame_id는 계약상 무시하지만 역직렬화가 쓸 자리는 있어야 한다. */
 static geometry_msgs__msg__TwistStamped s_cmd_vel;
 static char s_cmd_vel_frame_id[CMD_VEL_FRAME_ID_CAP];
@@ -319,6 +326,19 @@ static void message_memory_init(void)
   memset(&s_base_status, 0, sizeof(s_base_status));
   bind_string(&s_base_status.header.frame_id, s_base_status_frame_id,
               sizeof(s_base_status_frame_id), "");
+
+  memset(&s_imu, 0, sizeof(s_imu));
+  bind_string(&s_imu.header.frame_id, s_imu_frame_id, sizeof(s_imu_frame_id),
+              IMU_FRAME_ID);
+
+  /* orientation은 없다. 이 칩에는 융합이 없고 융합은 호스트 EKF 한 곳에서 한다
+     (upgrade_plan.md 5.1절). sensor_msgs/Imu 규약대로 [0] = -1로 알린다. */
+  s_imu.orientation.w = 1.0;
+  s_imu.orientation_covariance[0] = -1.0;
+
+  /* 각속도·가속도 공분산은 전부 0 = "모름"으로 둔다(sensor_msgs/Imu 규약). 값은
+     캘리브레이션 상수라 펌웨어 밖에 둔다. 호스트 mr_base imu_node가 파라미터로 채워
+     `/imu/data`로 다시 낸다. */
 }
 
 /* ------------------------------------------------------------------------- */
@@ -330,6 +350,7 @@ static rcl_node_t         s_node;
 static rcl_allocator_t    s_allocator;
 static rcl_publisher_t    s_pub_joint_states;
 static rcl_publisher_t    s_pub_base_status;
+static rcl_publisher_t    s_pub_imu;
 static rcl_subscription_t s_sub_cmd_vel;
 static rclc_executor_t    s_executor;
 static bool               s_entities_created;
@@ -342,6 +363,9 @@ static micro_ros_metrics_t s_metrics;
    어느 경로에서 왔는지 알 수 있다. */
 #define CMD_VEL_SEQ_BASE  0x80000000UL
 static uint32_t s_cmd_vel_seq;
+
+/* 마지막으로 처리한 IMU 표본 seq. 같은 표본을 두 번 내보내지 않는다. */
+static uint32_t s_imu_last_seq;
 
 static uint32_t s_next_joint_states_ms;
 static uint32_t s_next_base_status_ms;
@@ -432,6 +456,7 @@ static bool entities_create(void)
   memset(&s_node, 0, sizeof(s_node));
   memset(&s_pub_joint_states, 0, sizeof(s_pub_joint_states));
   memset(&s_pub_base_status, 0, sizeof(s_pub_base_status));
+  memset(&s_pub_imu, 0, sizeof(s_pub_imu));
   memset(&s_sub_cmd_vel, 0, sizeof(s_sub_cmd_vel));
   memset(&s_executor, 0, sizeof(s_executor));
 
@@ -468,6 +493,15 @@ static bool entities_create(void)
     return false;
   }
 
+  ret = rclc_publisher_init_best_effort(
+      &s_pub_imu, &s_node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+      TOPIC_IMU_DATA_RAW);
+  if (ret != RCL_RET_OK)
+  {
+    return false;
+  }
+
   ret = rclc_subscription_init_best_effort(
       &s_sub_cmd_vel, &s_node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, TwistStamped),
@@ -493,6 +527,9 @@ static bool entities_create(void)
   /* 시간 동기는 여기서 처음 시도하고 실패하면 CONNECTED 안에서 재시도한다. 동기
      전에는 어떤 /cmd_vel도 실행하지 않으므로 연결 자체를 막을 필요는 없다. */
   s_next_time_sync_ms = platform_now_ms();
+
+  /* 끊겨 있던 동안의 표본을 "덮인 표본"으로 세지 않는다. */
+  s_imu_last_seq = 0U;
   return true;
 }
 
@@ -512,6 +549,10 @@ static bool entities_destroy(void)
     ok = false;
   }
   if (rcl_publisher_fini(&s_pub_base_status, &s_node) != RCL_RET_OK)
+  {
+    ok = false;
+  }
+  if (rcl_publisher_fini(&s_pub_imu, &s_node) != RCL_RET_OK)
   {
     ok = false;
   }
@@ -635,6 +676,10 @@ static void publish_base_status(uint32_t now_ms)
   s_base_status.loop_count = status.loop_count;
   s_base_status.loop_overruns = status.loop_overruns;
 
+  /* HealthTask의 필터 출력이다. 측정할 수 없으면 NaN이 그대로 나간다. 0 V를 대신
+     내보내면 누군가 "배터리가 비었다"로 읽는다. */
+  s_base_status.supply_voltage = app_link_get_supply_voltage();
+
   if (rcl_publish(&s_pub_base_status, &s_base_status, NULL) == RCL_RET_OK)
   {
     s_metrics.base_status_count++;
@@ -642,6 +687,79 @@ static void publish_base_status(uint32_t now_ms)
   else
   {
     s_metrics.base_status_fail_count++;
+  }
+}
+
+/**
+  * @brief  `/imu/data_raw`. 새 표본이 있으면 한 번 내보낸다.
+  * @note   stamp는 읽은 시각이 아니라 샘플 시각이다. DRDY 에지에서 센서 필터 군지연을
+  *         뺀 시각이다. DWT cycle로 나이를 재서 epoch에서 뺀다. ms tick으로 재면
+  *         100 Hz 표본에 ±1 ms 지터가 붙는다.
+  */
+static void publish_imu(void)
+{
+  imu_sample_t sample;
+  uint32_t age_cycles;
+  int64_t epoch_ns;
+  int64_t stamp_ns;
+
+  if (!app_link_get_imu(&sample) || (sample.seq == s_imu_last_seq))
+  {
+    return;
+  }
+
+  /* 첫 표본이 아니면 seq 차이로 덮인 표본을 센다. ImuTask(P4)가 이 task보다 높아
+     블로킹 송신 동안에도 표본은 계속 덮어써진다. */
+  if ((s_imu_last_seq != 0U) && ((uint32_t)(sample.seq - s_imu_last_seq) > 1U))
+  {
+    s_metrics.imu_skipped_count += (uint32_t)(sample.seq - s_imu_last_seq) - 1U;
+  }
+  s_imu_last_seq = sample.seq;
+
+  /* bias가 없는 요레이트는 내보내지 않는다. ±0.5 °/s 공차면 1분에 30°가 흐른다.
+     부팅 뒤 바퀴가 2초 멈춰 있으면 풀린다. */
+  if (!sample.bias_valid)
+  {
+    s_metrics.imu_held_count++;
+    return;
+  }
+
+  /* 나이는 지금 시계로, 부호 있는 뺄셈으로 잰다. spin_once의 now_ms는 이 바퀴 첫머리
+     값이라 시간 동기가 막고 있던 동안 들어온 표본이 그보다 새롭다. unsigned로 빼면
+     약 49.7일이 나와 멀쩡한 표본을 버린다(2026-10-30 실기: 재동기마다 한 개씩).
+     publish_joint_states와 같은 처리다. */
+  if ((int32_t)(platform_now_ms() - sample.sample_ms) > (int32_t)IMU_MAX_AGE_MS)
+  {
+    s_metrics.imu_stale_count++;
+    return;
+  }
+
+  /* 두 시계를 붙여 읽는다. 사이에 선점이 끼면 그만큼 stamp가 미래로 간다. 끼어들 수
+     있는 것은 Control/Health/Imu task 한 번씩이고 각각 수십 µs라 10 ms 표본 간격에
+     비해 작다. */
+  age_cycles = platform_dwt_cycles() - sample.sample_cycles;
+  epoch_ns = rmw_uros_epoch_nanos();
+  stamp_ns = epoch_ns -
+             (((int64_t)age_cycles * NS_PER_S) / (int64_t)SystemCoreClock) -
+             ((int64_t)sample.group_delay_us * 1000LL);
+
+  s_imu.header.stamp.sec = (int32_t)(stamp_ns / NS_PER_S);
+  s_imu.header.stamp.nanosec = (uint32_t)(stamp_ns % NS_PER_S);
+
+  s_imu.angular_velocity.x = (double)sample.gyro_radps[0];
+  s_imu.angular_velocity.y = (double)sample.gyro_radps[1];
+  s_imu.angular_velocity.z = (double)sample.gyro_radps[2];
+  s_imu.linear_acceleration.x = (double)sample.accel_mps2[0];
+  s_imu.linear_acceleration.y = (double)sample.accel_mps2[1];
+  s_imu.linear_acceleration.z = (double)sample.accel_mps2[2];
+
+  if (rcl_publish(&s_pub_imu, &s_imu, NULL) == RCL_RET_OK)
+  {
+    s_metrics.imu_count++;
+  }
+  else
+  {
+    s_metrics.imu_fail_count++;
   }
 }
 
@@ -680,6 +798,9 @@ static bool spin_once(uint32_t now_ms)
   {
     return false;
   }
+
+  /* 주기가 아니라 표본 도착으로 돈다. 이 task 주기(2 ms)가 곧 발행 지연의 상한이다. */
+  publish_imu();
 
   if ((int32_t)(now_ms - s_next_joint_states_ms) >= 0)
   {
@@ -759,6 +880,7 @@ void micro_ros_task(void *argument)
 
   memset(&s_metrics, 0, sizeof(s_metrics));
   s_cmd_vel_seq = 0U;
+  s_imu_last_seq = 0U;
   s_escaped_alloc_count = 0U;
   s_entities_created = false;
 

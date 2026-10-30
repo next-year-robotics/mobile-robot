@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "control_types.h"
+#include "imu_types.h"
 
 /**
   * @brief  명령 snapshot을 길이 1 mailbox에 게시하고 ControlTask를 깨운다.
@@ -65,5 +66,21 @@ void app_link_urgent_stop_from_isr(uint32_t fault_flags);
   * @brief  ISR이 LegacyIoTask를 깨운다(수신 프레임 경계).
   */
 void app_link_notify_io_from_isr(void);
+
+/**
+  * @brief  ImuTask가 표본을 길이 1 mailbox에 덮어쓴다.
+  * @note   overwrite다. MicroRosTask가 읽기 전에 다음 표본이 오면 앞의 것은 사라진다.
+  *         소비자는 seq 차이로 잃은 수를 센다.
+  */
+bool app_link_post_imu(const imu_sample_t *sample);
+
+/** @brief 최신 IMU 표본을 읽는다(소비하지 않는다). 아직 없으면 false. */
+bool app_link_get_imu(imu_sample_t *out);
+
+/**
+  * @brief  HealthTask가 잰 배터리 전압 [V]. 측정할 수 없으면 NaN이다.
+  * @note   32-bit 한 word라 잠금 없이 읽는다.
+  */
+float app_link_get_supply_voltage(void);
 
 #endif /* APP_LINK_H */

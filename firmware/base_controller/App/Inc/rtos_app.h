@@ -7,7 +7,8 @@
   *
   *          task/IRQ/데이터 소유권
   *            - ControlTask  P5 : TIM6 tick, 엔코더 샘플, 워치독, TIM1 출력
-  *            - HealthTask   P4 : heartbeat/stack/fault 관측, LED
+  *            - HealthTask   P4 : heartbeat/stack/fault 관측, LED, ADC1(배터리 전압)
+  *            - ImuTask      P4 : SPI2, INT1(EXTI0), IMU 초기화/표본/bias
   *            - MicroRosTask P3 : USART1, micro-ROS 세션/pub/sub/재접속
   *            - LegacyIoTask P2 : USART2 RX/TX, ASCII 파싱, ACK, 50 Hz telemetry
   ******************************************************************************
@@ -55,6 +56,7 @@ typedef struct
   uint32_t stack_free_timer_words;
   uint32_t stack_free_smoke_words;    /* U3_SMOKE_TEST build에서만 갱신된다 */
   uint32_t stack_free_micro_ros_words;/* MICRO_ROS build에서만 갱신된다 */
+  uint32_t stack_free_imu_words;
 
   uint32_t health_stall_events;
   uint32_t health_max_stall_ms;
@@ -124,6 +126,59 @@ typedef struct
   uint32_t mr_uart1_rx_overflow_count;
   uint32_t mr_uart1_rearm_count;
   uint32_t mr_uart1_tx_fail_count;
+
+  /* `/imu/data_raw` 발행 (MicroRosTask). */
+  uint32_t mr_imu_count;
+  uint32_t mr_imu_fail_count;
+  uint32_t mr_imu_held_count;         /* bias가 아직 없어 발행하지 않은 표본 */
+  uint32_t mr_imu_stale_count;        /* IMU_MAX_AGE_MS를 넘겨 버린 표본 */
+  uint32_t mr_imu_skipped_count;      /* 읽기 전에 덮여 발행하지 못한 표본 (seq 차이) */
+
+  /* ---- IMU (ImuTask) ----
+     bring-up 순서: imu_who_am_i = 0x47 → imu_init_status = 0 → imu_ready = 1 →
+     imu_drdy_count 증가(INT1) → imu_bias_valid = 1. 막힌 단계가 고장 위치다. */
+  uint32_t imu_ready;
+  uint32_t imu_init_attempts;
+  uint32_t imu_init_status;           /* icm42688_status_t: 0 OK / 1 BUS / 2 WHO_AM_I / 3 VERIFY */
+  uint32_t imu_reinit_count;
+  uint32_t imu_who_am_i;
+  uint32_t imu_fail_reg;
+  uint32_t imu_fail_wrote;
+  uint32_t imu_fail_read;
+  uint32_t imu_sample_count;
+  uint32_t imu_invalid_count;
+  uint32_t imu_read_fail_count;
+  uint32_t imu_spi_error_count;
+  uint32_t imu_drdy_count;
+  uint32_t imu_drdy_timeout_count;
+  uint32_t imu_drdy_missed_count;
+  uint32_t imu_stale_read_count;
+  uint32_t imu_bias_valid;
+  uint32_t imu_bias_update_count;
+  uint32_t imu_bias_reject_count;
+  int32_t  imu_bias_x_mdps;
+  int32_t  imu_bias_y_mdps;
+  int32_t  imu_bias_z_mdps;
+  int32_t  imu_gyro_x_mdps;           /* 마지막 표본, bias 뺀 값 */
+  int32_t  imu_gyro_y_mdps;
+  int32_t  imu_gyro_z_mdps;
+  int32_t  imu_accel_x_mg;
+  int32_t  imu_accel_y_mg;
+  int32_t  imu_accel_z_mg;
+  int32_t  imu_temp_cdeg;
+
+  /* ---- 배터리 (HealthTask, ADC1) ----
+     bat_mv를 멀티미터 VB_LOGIC와 대조한다. 어긋나면 BAT_DIVIDER_GAIN을 고친다. */
+  uint32_t bat_valid;
+  uint32_t bat_mv;                    /* 필터 출력 */
+  uint32_t bat_last_mv;               /* 필터 전 마지막 표본 */
+  uint32_t bat_vdda_mv;               /* VREFINT로 역산한 VDDA */
+  uint32_t bat_raw;                   /* PA4 12-bit */
+  uint32_t bat_vrefint_raw;
+  uint32_t bat_vrefint_cal;           /* OTP 0x1FFF7A2A */
+  uint32_t bat_sample_count;
+  uint32_t bat_reject_count;
+  uint32_t bat_last_reject;           /* battery_reject_t */
 } rtos_metrics_t;
 
 extern rtos_metrics_t g_rtos_metrics;
