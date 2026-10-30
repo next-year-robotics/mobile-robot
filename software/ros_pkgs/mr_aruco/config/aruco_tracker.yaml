@@ -34,9 +34,12 @@
     publish_tf: true
 
     pose_selector:
-      # 정면에 가까운 마커는 PnP 해가 둘 나올 수 있다. 재투영 오차가 작은 쪽을
-      # 고른다. 정렬에서 자세가 뒤집혀 튀면 PLANE_NORMAL_PARALLEL을 시험해 볼 것.
-      strategy: REPROJECTION_ERROR
+      # 정면에 가까운 평면 마커는 재투영 오차가 비슷한 PnP 해가 둘 나온다.
+      # REPROJECTION_ERROR는 2026-08-30 바닥 정렬에서 정지에 가까운 같은 위치에서도
+      # yaw를 -3.10 <-> -2.87 rad로 바꿨고, standoff 진입점 방위를
+      # +0.30 <-> -0.33 rad로 뒤집어 YAW/DISTANCE 발진을 만들었다. 카메라 광축과
+      # 마커 법선이 가장 평행한 해를 고르면 이 평면 모호성을 일관되게 푼다.
+      strategy: PLANE_NORMAL_PARALLEL
       debug: false
 
     aruco:

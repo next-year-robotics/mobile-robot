@@ -65,6 +65,38 @@ class AlignConfig:
     max_angular_accel: float = 2.5
     min_linear_mps: float = 0.004
     min_angular_rps: float = 0.008
+    # 바닥 정지마찰을 넘는 최소 제자리 회전 지령. 선속도가 0인 회전 출력이
+    # 이보다 작으면 부호를 유지한 채 끌어올린다. 주행 중 작은 조향까지 끌어올리면
+    # 진입점으로 접근할 때 급격한 호를 그려 마커를 시야 밖으로 밀 수 있다.
+    # 단순 데드밴드(min_angular_rps)와 역할이 다르다.
+    min_turn_rps: float = 0.0
+
+    # ---- 시야 유지
+    # 카메라는 base_footprint보다 앞에 있다. 제자리 회전은 base_footprint를 축으로
+    # 도는데 카메라는 이 반경의 호를 그리며 돌기 때문에, 마커의 **카메라 기준**
+    # 방위는 본체 기준 방위와 다르고 회전할수록 더 벌어진다. 0이면 둘을 같게 본다.
+    camera_forward_m: float = 0.0
+    # 마커 **중심**을 붙잡아 둘 시선 주위 반각의 상한. 화각 반각보다 작게 잡아
+    # 여유를 남긴다(오른쪽 실측 화각은 0.560 rad). 0이면 제약을 끈다.
+    #
+    # > **2026-08-30 M12-2가 이것 때문에 깨졌다.** 진입점 조준은 정확했는데
+    # > (오차 ±0.035 rad) 0.93 m 지점에서 마커가 카메라 기준 -26.8도로 밀려
+    # > 바깥 모서리가 오른쪽 화면 경계 32.10도를 넘었고, 10.6 s에 MARKER_LOST로
+    # > 끝났다. 제어법에 마커를 계속 봐야 한다는 조건이 아예 없었다.
+    fov_keep_rad: float = 0.0
+    # 마커 반폭. 검출에는 네 꼭짓점이 다 보여야 하므로 중심이 아니라 모서리가
+    # 화각 안에 있어야 하고, 모서리가 차지하는 각은 **거리에 따라 변한다**.
+    # 그래서 실제로 쓰는 원뿔은 거리마다 다르다 —
+    #
+    #     keep(r) = fov_keep_rad - atan(marker_half_m / r)
+    #
+    # 이것이 고정 원뿔보다 나은 이유는 큰 횡오차를 지우는 선회가 **멀리서**
+    # 일어나기 때문이다. 고정 원뿔은 그 구간까지 좁혀서 진입점에 영영 못 가게
+    # 막았고(수렴 실패), 그렇다고 넓히면 종반에 마커가 잘렸다.
+    marker_half_m: float = 0.075
+    # 원뿔이 아무리 좁아져도 이 아래로는 안 내린다. 마커에 아주 가까우면
+    # atan 항이 화각을 통째로 먹어 조향이 얼어붙는다.
+    fov_keep_min_rad: float = 0.10
 
     # ---- 단계 전이 (히스테리시스)
     yaw_enter_tol_rad: float = 0.06     # 이보다 작아지면 YAW_ALIGN을 나간다
@@ -82,6 +114,8 @@ class AlignConfig:
     # 최근 각속도 지령 부호가 이 창 안에서 이만큼 뒤집히면 발진으로 본다.
     oscillation_window: int = 30
     oscillation_flips: int = 8
+    # 이보다 작은 각속도는 실제 차체 발진이 아니라 정지 부근 잡음 보정으로 본다.
+    oscillation_min_angular_rps: float = 0.15
 
     def limits(self) -> ShapeLimits:
         return ShapeLimits(
@@ -196,6 +230,10 @@ class AlignController:
             if out.stable_for_s >= self.goal.stable_time_s:
                 out.done = True
                 return self._finish(out)
+            # 허용오차 안에서는 더 몰지 않고 정지 상태가 유지되는지 확인한다.
+            # min_turn_rps가 미소 보정을 실행 가능한 크기로 끌어올리므로 이 게이트가
+            # 없으면 성공 영역 안에서도 좌우로 계속 보정하며 다시 빠져나갈 수 있다.
+            return self._emit(0.0, 0.0, dt, out)
         else:
             self._stable_since = None
 
@@ -230,27 +268,75 @@ class AlignController:
         # 진입점을 본체 좌표계로. 마커 위치에서 바깥 법선으로 standoff만큼 나간 점이다.
         entry_x = pose.x + self.standoff_m * nx
         entry_y = pose.y + self.standoff_m * ny
+        entry_bearing = math.atan2(entry_y, entry_x)
+
+        cam_x = pose.x - self.config.camera_forward_m
+        cam_bearing = math.atan2(pose.y, cam_x)
+        cam_range = math.hypot(cam_x, pose.y)
         return _Geometry(bearing=bearing, los_m=los_m, yaw_err=yaw_err,
                          axial=axial, lateral=lateral, dist_err=dist_err,
                          pos_err=math.hypot(dist_err, lateral),
-                         entry_bearing=math.atan2(entry_y, entry_x),
-                         entry_forward=entry_x)
+                         entry_bearing=entry_bearing,
+                         entry_forward=entry_x,
+                         cam_bearing=cam_bearing,
+                         cam_range=cam_range,
+                         keep_rad=self._keep_cone(cam_range),
+                         aim=self._keep_in_view(entry_bearing, cam_bearing,
+                                                cam_range))
+
+    def _keep_cone(self, cam_range: float) -> float:
+        """이 거리에서 마커 모서리까지 화각 안에 두는 원뿔 반각.
+
+        마커 중심을 화각 경계에 두면 모서리는 이미 밖이다. 그 몫을 거리마다
+        빼 준다. 멀면 거의 `fov_keep_rad` 그대로고, 가까울수록 좁아진다.
+        """
+        cfg = self.config
+        if cfg.fov_keep_rad <= 0.0:
+            return 0.0
+        half = math.atan2(cfg.marker_half_m, max(cam_range, 1e-6))
+        return max(cfg.fov_keep_min_rad, cfg.fov_keep_rad - half)
+
+    def _keep_in_view(self, entry_bearing: float, cam_bearing: float,
+                      cam_range: float) -> float:
+        """진입점 조준을 마커 시선 주위 원뿔 안으로 자른다.
+
+        로봇이 조준 방향으로 δ만큼 돌면 마커의 카메라 기준 방위는 대략 δ만큼
+        반대로 움직인다. 그러므로 조준을 시선에서 원뿔 반각 안에 두면 다 돈
+        뒤에도 마커가 그 각도 안에 남는다. 회전 중 카메라가 그리는 호까지는
+        모형에 넣지 않았다 — 그만큼 여유를 화각보다 좁게 잡아 흡수한다.
+
+        원뿔이 마커 쪽으로 **끌어당기기도** 한다. 마커가 이미 경계를 넘었으면
+        (M12-2가 그랬다) 잘린 조준이 시선 쪽을 가리켜 로봇이 되돌아본다.
+        """
+        keep = self._keep_cone(cam_range)
+        if keep <= 0.0:
+            return entry_bearing
+        offset = wrap_angle(entry_bearing - cam_bearing)
+        clamped = max(-keep, min(keep, offset))
+        return wrap_angle(cam_bearing + clamped)
 
     def _advance_phase(self, g: '_Geometry') -> None:
         cfg = self.config
         if self.phase == PHASE_YAW:
-            if abs(g.entry_bearing) <= cfg.yaw_enter_tol_rad:
+            # 문턱은 `entry_bearing`이 아니라 실제로 조준하는 방향 `aim`에 건다.
+            # 시야 제약이 조준을 자르는 상황에서 진입점 방위를 기준으로 삼으면,
+            # 제자리 회전이 원뿔 경계에서 멈추는데 문턱은 영영 안 들어와
+            # YAW 단계에 갇힌 채 timeout까지 간다.
+            if abs(g.aim) <= cfg.yaw_enter_tol_rad:
                 self.phase = PHASE_DISTANCE
         elif self.phase == PHASE_DISTANCE:
             # 도착 판정이 먼저다. 진입점 위에 서면 그 점의 방위가 의미를 잃는데,
             # 그 상태에서 방위 문턱으로 YAW로 되돌아가면 제자리 회전에 갇힌다.
             if g.pos_err <= self._final_enter_m:
                 self.phase = PHASE_FINAL
-            elif abs(g.entry_bearing) > cfg.yaw_exit_tol_rad:
+            elif abs(g.aim) > cfg.yaw_exit_tol_rad:
                 self.phase = PHASE_YAW
 
     def _law(self, g: '_Geometry') -> tuple:
         """단계별 (v, ω). 앞 두 단계는 진입점을, FINAL은 마커를 본다.
+
+        앞 두 단계가 쓰는 것은 `entry_bearing`이 아니라 시야 제약을 통과한
+        `aim`이다. 둘은 마커가 화면 가장자리로 밀릴 때만 갈린다.
 
         FINAL에서 마커 중심 방위로 되돌아가는 것은 실수가 아니다. 진입점 위에
         서면 `lateral`이 이미 0이라 "마커를 향한다"와 "법선에 정렬한다"가 같은
@@ -262,9 +348,9 @@ class AlignController:
         """
         cfg = self.config
         if self.phase == PHASE_YAW:
-            return 0.0, cfg.k_bearing * g.entry_bearing
+            return 0.0, cfg.k_bearing * g.aim
         if self.phase == PHASE_DISTANCE:
-            return cfg.k_dist * g.entry_forward, cfg.k_bearing * g.entry_bearing
+            return cfg.k_dist * g.entry_forward, cfg.k_bearing * g.aim
         return (cfg.k_dist * g.dist_err,
                 cfg.k_bearing * g.bearing + cfg.k_final_yaw * g.yaw_err)
 
@@ -272,6 +358,10 @@ class AlignController:
 
     def _emit(self, v_cmd: float, w_cmd: float, dt: float,
               out: AlignCommand) -> AlignCommand:
+        in_place = math.isclose(v_cmd, 0.0, abs_tol=1e-9)
+        if (in_place and self.config.min_turn_rps > 0.0
+                and 0.0 < abs(w_cmd) < self.config.min_turn_rps):
+            w_cmd = math.copysign(self.config.min_turn_rps, w_cmd)
         out.v, out.w = self.shaper.shape(v_cmd, w_cmd, dt)
         out.oscillating = self._note_angular_sign(out.w)
         return out
@@ -282,7 +372,7 @@ class AlignController:
         게인이 높거나 마커 자세가 떨릴 때 로봇이 좌우로 진동하며 수렴하지 못하는
         경우가 있다. 시간 초과까지 기다리면 그동안 계속 흔들리므로 일찍 잡아낸다.
         """
-        if w == 0.0:
+        if abs(w) < self.config.oscillation_min_angular_rps:
             return False
         self._w_signs.append(1 if w > 0 else -1)
         if len(self._w_signs) < self._w_signs.maxlen:
@@ -313,3 +403,7 @@ class _Geometry:
     pos_err: float          # hypot(dist_err, lateral) = 진입점까지 거리
     entry_bearing: float    # 진입점 방위
     entry_forward: float    # 진입점의 전방 성분 (부호 있음)
+    cam_bearing: float      # 마커 중심 방위 — 카메라 원점 기준
+    cam_range: float        # 카메라에서 마커까지 거리
+    keep_rad: float         # 이 거리에서 쓰는 원뿔 반각
+    aim: float              # 실제 조준 방향. 시야 제약이 진입점 방위를 자른 결과

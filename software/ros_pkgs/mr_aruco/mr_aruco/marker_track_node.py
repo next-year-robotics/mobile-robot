@@ -13,10 +13,12 @@
 """
 from __future__ import annotations
 
+import math
+
 from aruco_opencv_msgs.msg import ArucoDetection
 from geometry_msgs.msg import PoseStamped
 from mr_aruco.tracking import (
-    marker_normal_yaw, MarkerTracker, PlanarPose,
+    continuous_planar_normal_yaw, marker_normal_yaw, MarkerTracker, PlanarPose,
     scale_point_from_origin,
     STATUS_HOLDING, STATUS_LOST, STATUS_TRACKING,
     TrackConfig,
@@ -98,6 +100,7 @@ class MarkerTrackNode(Node):
         self._last_detection_msg_s = None
         self._observed_stamp = None          # 마지막으로 마커를 실제로 본 시각
         self._yaw_valid = False
+        self._yaw_reference = None
         self._last_summary = ''
         self.create_timer(float(self.get_parameter('watchdog_period_s').value),
                           self.on_watchdog)
@@ -177,6 +180,14 @@ class MarkerTrackNode(Node):
             q = marker.pose.orientation
             yaw, horizontal = marker_normal_yaw(q.x, q.y, q.z, q.w)
             yaw_valid = horizontal >= self.min_normal_horizontal
+            # 평면 PnP의 두 법선 해가 재투영 오차나 카메라 각도에 따라 바뀌어도
+            # 직전 정상 법선과 이어지는 후보를 고른다. 반사축은 카메라 광학
+            # 중심에서 마커로 향하는 수평 시선이다.
+            ray_bearing = math.atan2(
+                corrected[1] - self.camera_origin[1],
+                corrected[0] - self.camera_origin[0])
+            yaw = continuous_planar_normal_yaw(
+                yaw, ray_bearing, self._yaw_reference)
             if not yaw_valid:
                 self.get_logger().warn(
                     f'마커 {self.target_id}의 법선이 거의 수직이다(수평 성분 '
@@ -198,6 +209,8 @@ class MarkerTrackNode(Node):
         if pose is not None and not out.rejected_jump:
             self._observed_stamp = observed_stamp
             self._yaw_valid = bool(observed_yaw_valid)
+            if self._yaw_valid:
+                self._yaw_reference = pose.yaw
 
         msg = MarkerTrack()
         # stamp는 노드 시계가 아니라 "마지막으로 실제로 본 시각"이다. hold 중에는
@@ -222,6 +235,7 @@ class MarkerTrackNode(Node):
         if out.status == STATUS_LOST:
             self._observed_stamp = None
             self._yaw_valid = False
+            self._yaw_reference = None
 
     def _publish_dock_pose(self, msg: ArucoDetection) -> None:
         """싱싱한 관측만 내보낸다.

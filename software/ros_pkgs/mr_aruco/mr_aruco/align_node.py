@@ -62,6 +62,11 @@ class AlignNode(Node):
         self.declare_parameter('max_angular_accel', 2.5)
         self.declare_parameter('min_linear_mps', 0.004)
         self.declare_parameter('min_angular_rps', 0.008)
+        self.declare_parameter('min_turn_rps', 0.0)
+        self.declare_parameter('camera_forward_m', 0.0)
+        self.declare_parameter('fov_keep_rad', 0.0)
+        self.declare_parameter('marker_half_m', 0.075)
+        self.declare_parameter('fov_keep_min_rad', 0.10)
         self.declare_parameter('yaw_enter_tol_rad', 0.06)
         self.declare_parameter('yaw_exit_tol_rad', 0.20)
         self.declare_parameter('dist_enter_tol_m', 0.03)
@@ -69,6 +74,7 @@ class AlignNode(Node):
         self.declare_parameter('loss_timeout_s', 3.0)
         self.declare_parameter('oscillation_window', 30)
         self.declare_parameter('oscillation_flips', 8)
+        self.declare_parameter('oscillation_min_angular_rps', 0.15)
         # goal이 0을 주면 쓰는 기본 허용오차.
         self.declare_parameter('default_dist_tol_m', 0.04)
         self.declare_parameter('default_yaw_tol_rad', 0.14)
@@ -86,6 +92,11 @@ class AlignNode(Node):
             max_angular_accel=self._f('max_angular_accel'),
             min_linear_mps=self._f('min_linear_mps'),
             min_angular_rps=self._f('min_angular_rps'),
+            min_turn_rps=self._f('min_turn_rps'),
+            camera_forward_m=self._f('camera_forward_m'),
+            fov_keep_rad=self._f('fov_keep_rad'),
+            marker_half_m=self._f('marker_half_m'),
+            fov_keep_min_rad=self._f('fov_keep_min_rad'),
             yaw_enter_tol_rad=self._f('yaw_enter_tol_rad'),
             yaw_exit_tol_rad=self._f('yaw_exit_tol_rad'),
             dist_enter_tol_m=self._f('dist_enter_tol_m'),
@@ -93,6 +104,7 @@ class AlignNode(Node):
             loss_timeout_s=self._f('loss_timeout_s'),
             oscillation_window=int(self.get_parameter('oscillation_window').value),
             oscillation_flips=int(self.get_parameter('oscillation_flips').value),
+            oscillation_min_angular_rps=self._f('oscillation_min_angular_rps'),
         ))
 
         self.cmd_frame_id = self.get_parameter('cmd_frame_id').value
