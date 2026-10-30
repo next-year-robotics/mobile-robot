@@ -9,15 +9,15 @@ from __future__ import annotations
 
 import math
 
-import rclpy
 from geometry_msgs.msg import TransformStamped
+from mr_base.odometry import DiffDriveOdometry, RebaseReason
 from nav_msgs.msg import Odometry
+import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
-
-from mr_base.odometry import DiffDriveOdometry, RebaseReason
 
 try:
     from mr_msgs.msg import BaseStatus
@@ -176,7 +176,7 @@ def main(args=None) -> None:
     node = OdomNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
