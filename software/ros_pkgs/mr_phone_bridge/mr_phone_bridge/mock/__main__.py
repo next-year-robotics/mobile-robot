@@ -33,7 +33,7 @@ CONSOLE_HELP = """\
   sos [reason] [severity]   SOS 발행 (reason: tracking_lost|stuck|low_battery|manual, severity: critical|warning)
   clear [resolution]        활성 SOS 모두 종료 (tracking_recovered|handled|cancelled)
   mission <state>           mission_state 강제 (idle|starting|active|arrived|cancelling|cancelled|error|unknown)
-  tracking <state>          tracking_state 강제 (unavailable|searching|following|lost|error)
+  tracking <state>          tracking_state 강제 (unavailable|searching|following|lost|idle|error)
   bridge <state>            bridge_state 강제 (ready|degraded|error)
   battery <0-100|null>      battery_percent
   error <문장|null>         last_error

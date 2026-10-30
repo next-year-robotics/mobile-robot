@@ -10,7 +10,7 @@ from __future__ import annotations
 MISSION = {'idle': 0, 'starting': 1, 'active': 2, 'arrived': 3, 'cancelling': 4, 'cancelled': 5, 'error': 6,
            'unknown': 255}
 # RobotAppStatus.TRACKING_*
-TRACKING = {'unavailable': 0, 'searching': 1, 'following': 2, 'lost': 3, 'error': 4, 'unknown': 255}
+TRACKING = {'unavailable': 0, 'searching': 1, 'following': 2, 'lost': 3, 'error': 4, 'idle': 5, 'unknown': 255}
 # TripCommand.COMMAND_*
 TRIP_COMMAND = {'start': 1, 'cancel': 2}
 # PhoneLocation.REASON_*
