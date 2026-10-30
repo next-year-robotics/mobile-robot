@@ -16,7 +16,7 @@ UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 KEY_BAD = re.compile(r'[.$#\[\]/\x00-\x1f\x7f]')
 
 MISSION_STATES = ('idle', 'starting', 'active', 'arrived', 'cancelling', 'cancelled', 'error', 'unknown')
-TRACKING_STATES = ('unavailable', 'searching', 'following', 'lost', 'error', 'unknown')
+TRACKING_STATES = ('unavailable', 'searching', 'following', 'lost', 'idle', 'error', 'unknown')
 BASE_AGENT_STATES = ('waiting', 'available', 'connected', 'disconnected')   # mr_msgs/BaseStatus.AGENT_*
 
 SOS_REQUEST_MESSAGES = {
@@ -81,6 +81,25 @@ def sos_wire_id(ros_id: str) -> str:
 def safe_key(s: str) -> str:
     """RTDB 키로 쓸 수 없는 문자를 바꾼다."""
     return KEY_BAD.sub('_', s) or '_'
+
+
+def topic_tree(topics: dict[str, dict]) -> dict:
+    """{'/base/status': leaf} → {'base': {'status': leaf}} (care-telemetry README 3.5).
+    RTDB 키에 '/'를 쓸 수 없어서 토픽 이름을 경로로 펼친다. 한 이름이 다른 이름의 앞부분 경로면 ValueError."""
+    tree: dict = {}
+    for name, leaf in topics.items():
+        parts = [safe_key(p) for p in name.strip('/').split('/') if p]
+        if not parts:
+            raise ValueError(f'empty topic name {name!r}')
+        node = tree
+        for p in parts[:-1]:
+            node = node.setdefault(p, {})
+            if 'last_seen_ms' in node:
+                raise ValueError(f'topic {name!r} is below another topic')
+        if parts[-1] in node:
+            raise ValueError(f'topic {name!r} collides with another topic')
+        node[parts[-1]] = dict(leaf)
+    return tree
 
 
 def finite_or_none(x):

@@ -29,6 +29,20 @@ def test_trip_message_matches_fixture():
     assert M.trip_start_message('집', '시장') == fx['message']
 
 
+def test_topic_tree_nests_ros_names():
+    tree = M.topic_tree({'/base/status': {'last_seen_ms': 1, 'hz': 2.0}, '/joint_states': {'last_seen_ms': 0, 'hz': 0},
+                         '/robot/app_status': {'last_seen_ms': 3, 'hz': 0.5}})
+    assert tree == {'base': {'status': {'last_seen_ms': 1, 'hz': 2.0}},
+                    'joint_states': {'last_seen_ms': 0, 'hz': 0},
+                    'robot': {'app_status': {'last_seen_ms': 3, 'hz': 0.5}}}
+    with pytest.raises(ValueError):                  # README 3.5: 한 토픽이 다른 토픽의 앞부분 경로면 안 된다
+        M.topic_tree({'/robot': {'last_seen_ms': 1, 'hz': 1}, '/robot/app_status': {'last_seen_ms': 1, 'hz': 1}})
+    with pytest.raises(ValueError):
+        M.topic_tree({'/robot/app_status': {'last_seen_ms': 1, 'hz': 1}, '/robot': {'last_seen_ms': 1, 'hz': 1}})
+    from mr_care_telemetry.agent import DIAG_TOPICS
+    M.topic_tree({t: {'last_seen_ms': 0, 'hz': 0} for t in DIAG_TOPICS})
+
+
 def test_push_ids_sort_by_time_and_within_ms():
     p = M.PushIds()
     ids = [p(1790000000000), p(1790000000000), p(1790000000000), p(1790000000001), p(1789999999999)]
@@ -125,6 +139,10 @@ class FakeGoogle(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if self.path == '/token-denied':
+            self.rfile.read(int(self.headers['Content-Length']))
+            self._reply(400, b'{"error": "invalid_grant", "error_description": "Invalid JWT Signature."}')
+            return
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import padding
         form = parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode())
@@ -187,6 +205,24 @@ def test_service_account_jwt_flow(fake_google):
     with pytest.raises(RtdbError) as ei:
         client.put('robots/mr-001/status', {'a': 4})
     assert ei.value.status == 400 and not ei.value.transient
+    assert str(ei.value) == 'PUT robots/mr-001/status -> 400 x'                 # 본문의 error 문구만 한 줄로
+    FakeGoogle.status_override['/robots/mr-001/status.json'] = 404            # DB URL 오류: 큐를 버리지 않는다
+    with pytest.raises(RtdbError) as ei:
+        client.put('robots/mr-001/status', {'a': 5})
+    assert ei.value.status == 404 and ei.value.transient
+
+
+def test_token_endpoint_rejection_is_transient(fake_google, tmp_path):
+    """토큰 발급 거절(키 오류·시계 어긋남)은 쓰려던 작업의 잘못이 아니다. 큐에서 버리면 안 된다."""
+    base, sa = fake_google
+    info = json.loads(sa.read_text())
+    info['token_uri'] = f'{base}/token-denied'
+    bad = tmp_path / 'bad.json'
+    bad.write_text(json.dumps(info))
+    client = RtdbClient(base, namespace='x', token=ServiceAccountToken(str(bad)))
+    with pytest.raises(RtdbError) as ei:
+        client.put('robots/mr-001/status', {'a': 1})
+    assert ei.value.transient and ei.value.status == 400 and 'invalid_grant' in str(ei.value)
 
 
 def test_missing_service_account_is_transient(tmp_path):

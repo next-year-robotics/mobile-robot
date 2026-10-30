@@ -141,3 +141,56 @@ def test_node_topics_to_rtdb(monkeypatch, tmp_path):
         probe.destroy_node()
         rclpy.try_shutdown(context=ctx)
         th.join(5)
+
+
+def test_agent_logs_reach_rosout(monkeypatch):
+    """에이전트 로그가 ROS 로거로 간다: RTDB가 diag를 400으로 거절하면 /rosout에 ERROR가 뜬다
+    (2026-09-27 전에는 노드 로그에 에이전트 줄이 하나도 없었고, 오류는 diag.recent_errors에만 묻혔다)."""
+    monkeypatch.setenv('ROS_AUTOMATIC_DISCOVERY_RANGE', 'LOCALHOST')
+    import rclpy
+    from conftest import MemoryRtdb
+    from rcl_interfaces.msg import Log
+    from rclpy.executors import MultiThreadedExecutor
+    from rclpy.node import Node
+    from rclpy.parameter import Parameter
+
+    from mr_care_telemetry.node import TelemetryNode
+    from mr_care_telemetry.outbox import Outbox
+
+    ctx = rclpy.Context()
+    rclpy.init(context=ctx, domain_id=TEST_DOMAIN_ID)
+    probe = Node('probe_log', context=ctx)
+    logs: list = []
+    # /rosout 발행자는 TransientLocal(depth 1000)이다. 매칭 전에 나간 로그(기동 직후 1회뿐인 ERROR)도 받는다
+    from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+    probe.create_subscription(Log, '/rosout', logs.append, QoSProfile(
+        history=HistoryPolicy.KEEP_LAST, depth=1000, reliability=ReliabilityPolicy.RELIABLE,
+        durability=DurabilityPolicy.TRANSIENT_LOCAL))
+    ex = MultiThreadedExecutor(context=ctx)
+    ex.add_node(probe)
+    th = threading.Thread(target=ex.spin, daemon=True)
+    th.start()
+    db = MemoryRtdb()
+    db.fail_status['robots/mr-001/diag'] = 400
+    tel = None
+    try:
+        time.sleep(0.5)                                  # /rosout 구독이 먼저 매칭되게
+        tel = TelemetryNode(client=db, outbox=Outbox(), context=ctx,
+                            parameter_overrides=[Parameter('publish_diag', value=True)])
+        tel.agent.cfg.loop_s = 0.05
+        ex.add_node(tel)
+        end = time.monotonic() + 8.0
+        while time.monotonic() < end and not any('rejected diag' in m.msg for m in logs):
+            time.sleep(0.05)
+        mine = [m for m in logs if m.name == 'mr_care_telemetry']
+        err = [m for m in mine if 'rejected diag' in m.msg]
+        assert err and err[0].level == Log.ERROR and '400' in err[0].msg, [(m.name, m.msg) for m in logs]
+        assert any(m.level == Log.INFO and 'agent.online' in m.msg for m in mine)
+    finally:
+        ex.shutdown()
+        if tel is not None:
+            tel.agent.stop(flush_timeout_s=0.5)
+            tel.destroy_node()
+        probe.destroy_node()
+        rclpy.try_shutdown(context=ctx)
+        th.join(5)

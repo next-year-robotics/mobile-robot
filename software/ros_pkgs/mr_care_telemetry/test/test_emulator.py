@@ -6,6 +6,7 @@
 java 또는 에뮬레이터 jar가 없으면 건너뛴다.
 """
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -113,7 +114,8 @@ def test_offline_then_online_keeps_ts_and_order(tmp_path, schemas):
 
 
 def test_contract_rules_on_emulator(emulator):
-    """계약 규칙: 비로그인 읽기 금지, 클라이언트 쓰기 금지, 에이전트(관리자)는 쓴다."""
+    """계약 규칙: 비로그인 읽기 금지, 클라이언트 쓰기 금지, 에이전트(관리자)는 쓴다.
+    역할별(README 4장): guardian·dev 모두 meta·status·events·sos를 읽고, diag는 dev만. 로봇 노드 통째 읽기는 아무도."""
     ns = f'rules{uuid.uuid4().hex[:6]}'
     rules = load_json(contracts_dir() / 'database.rules.json')
     emulator.rest('PUT', '.settings/rules', rules, ns=ns)
@@ -125,6 +127,29 @@ def test_contract_rules_on_emulator(emulator):
         emulator.rest('PUT', 'robots/mr-001/status', {'x': 1}, ns=ns, auth=None)
     assert ei.value.code in (401, 403)
     assert emulator.rest('GET', 'robots/mr-001/status', ns=ns) == {'mission_state': 'idle'}
+
+    emulator.rest('PATCH', '', {'access/mr-001': {'g1': 'guardian', 'd1': 'dev'},
+                                'robots/mr-001/meta': {'robot_id': 'mr-001'},
+                                'robots/mr-001/events/-N0000000000000000001': {'kind': 'agent.online'},
+                                'robots/mr-001/sos/s1': {'reason': 'manual'},
+                                'robots/mr-001/diag': {'updated_at_ms': 1}}, ns=ns)
+
+    def can_read(uid, path):
+        try:
+            emulator.rest('GET', path, ns=ns, as_uid=uid)
+            return True
+        except urllib.error.HTTPError as e:
+            assert e.code in (401, 403)
+            return False
+
+    kids = ['meta', 'status', 'events', 'sos', 'diag']
+    assert [can_read('g1', f'robots/mr-001/{k}') for k in kids] == [True, True, True, True, False]
+    assert [can_read('d1', f'robots/mr-001/{k}') for k in kids] == [True, True, True, True, True]
+    assert [can_read('x9', f'robots/mr-001/{k}') for k in kids] == [False] * 5
+    assert not can_read('g1', 'robots/mr-001') and not can_read('d1', 'robots/mr-001')
+    assert can_read('g1', 'access/mr-001/g1') and not can_read('g1', 'access/mr-001/d1')
+    with pytest.raises(urllib.error.HTTPError):                                       # dev도 쓰기는 못 한다
+        emulator.rest('PUT', 'robots/mr-001/diag', {'x': 1}, ns=ns, as_uid='d1')
 
 
 def test_cli_requires_explicit_target():
@@ -150,3 +175,37 @@ def test_dump_json_is_utf8(emulator):
     client = RtdbClient(DB, emulator_host=emulator.host, namespace=ns)
     client.put('x', {'message': '어르신을 다시 찾았어요'})
     assert json.dumps(emulator.rest('GET', 'x', ns=ns), ensure_ascii=False) == '{"message": "어르신을 다시 찾았어요"}'
+
+
+def test_diag_on_emulator(emulator, schemas, tmp_path, agent_log):
+    """2026-09-27 회귀: publish_diag인데 diag가 저장되지 않았다(키에 '/'). 실제 RTDB 규칙으로 쓰고 읽는다.
+    옛 모양은 에뮬레이터가 400으로 거절하고, 그 오류가 로그 ERROR로 나와야 한다."""
+    robot = f'mr-diag-{uuid.uuid4().hex[:6]}'
+    client = RtdbClient(DB, emulator_host=emulator.host)
+    agent = TelemetryAgent(AgentConfig(robot_id=robot, loop_s=0.05, publish_diag=True, diag_period_s=0.2), client,
+                           Outbox(tmp_path / 'q.db'))
+    agent.start()
+    try:
+        agent.on_base_status(agent_state='connected', cmd_watchdog_ok=True)
+        agent.on_marker(1)
+        diag = wait_for(lambda: emulator.rest('GET', f'robots/{robot}/diag'))
+        schemas.check('diag', diag)
+        rows = {}
+
+        def walk(node, path):                       # 대시보드 topicRows와 같은 읽기 규칙
+            if 'last_seen_ms' in node:
+                rows['/' + '/'.join(path)] = node
+                return
+            for k, v in node.items():
+                walk(v, path + [k])
+        walk(diag['topics'], [])
+        assert set(rows) == {'/base/status', '/joint_states', '/marker_track', '/robot/app_status'}
+        assert rows['/base/status']['last_seen_ms'] > 0
+
+        old_shape = {'updated_at_ms': 1, 'topics': {'/base/status': {'last_seen_ms': 1, 'hz': 1.0}}}
+        agent.diag_doc = lambda elapsed_s: old_shape
+        msg = wait_for(lambda: agent_log.messages(logging.ERROR, 'rejected diag'))[0]
+        assert '400' in msg and "can't be empty or contain" in msg and '\n' not in msg
+        assert agent.online is True
+    finally:
+        agent.stop()

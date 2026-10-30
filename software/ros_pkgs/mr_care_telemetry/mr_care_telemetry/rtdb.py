@@ -21,7 +21,10 @@ import urllib.request
 from typing import Any
 
 SCOPES = 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email'
-TRANSIENT_STATUS = {401, 403, 408, 425, 429}
+# 요청 내용 자체가 잘못된 경우(키 규칙 위반·크기 초과)만 영구 오류다. 다시 보내도 같으므로 큐에서 버린다.
+# 그 밖의 4xx(404 = DB URL 오류, 401/403 = 토큰, 402/423 = 요금제·DB 정지 등)는 설정·서버 상태 문제라
+# 고쳐지면 다시 보낼 수 있게 일시 오류로 두고 큐에 남긴다.
+PERMANENT_STATUS = {400, 413}
 
 
 class RtdbError(Exception):
@@ -95,8 +98,9 @@ class ServiceAccountToken:
                 with urllib.request.urlopen(req, timeout=self._timeout_s) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
             except urllib.error.HTTPError as e:
-                raise RtdbError(f'token endpoint {e.code}', status=e.code,
-                                transient=e.code >= 500 or e.code in TRANSIENT_STATUS) from None
+                # 토큰 실패(키 오류·시계 어긋남 등)는 쓰려던 작업의 잘못이 아니다: 항상 일시 오류로 두어 큐를 지킨다
+                raise RtdbError(f'token endpoint {e.code} {_token_error_detail(e.read()[:1000])}',
+                                status=e.code) from None
             except (urllib.error.URLError, socket.timeout, OSError) as e:
                 raise RtdbError(f'token endpoint unreachable: {e}') from None
             self._token = data['access_token']
@@ -106,6 +110,27 @@ class ServiceAccountToken:
     def invalidate(self) -> None:
         with self._lock:
             self._token = None
+
+
+def _error_detail(body: bytes) -> str:
+    """RTDB 오류 본문 `{"error": "..."}`에서 문구만 한 줄로 꺼낸다(로그·recent_errors용)."""
+    text = body.decode('utf-8', 'replace')
+    try:
+        msg = json.loads(text).get('error')
+        if isinstance(msg, str):
+            text = msg
+    except (ValueError, AttributeError):
+        pass
+    return ' '.join(text.split())[:200]
+
+
+def _token_error_detail(body: bytes) -> str:
+    """OAuth 오류 본문 `{"error": "invalid_grant", "error_description": "..."}` → 한 줄."""
+    try:
+        d = json.loads(body.decode('utf-8', 'replace'))
+        return ' '.join(f"{d.get('error', '')}: {d.get('error_description', '')}".split())[:200]
+    except (ValueError, AttributeError):
+        return _error_detail(body)
 
 
 def namespace_of(database_url: str) -> str:
@@ -169,11 +194,11 @@ class RtdbClient:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 body = resp.read()
         except urllib.error.HTTPError as e:
-            detail = e.read()[:200].decode('utf-8', 'replace')
+            detail = _error_detail(e.read()[:1000])
             if e.code == 401 and self._token is not None:
                 self._token.invalidate()
             raise RtdbError(f'{method} {path} -> {e.code} {detail}', status=e.code,
-                            transient=e.code >= 500 or e.code in TRANSIENT_STATUS) from None
+                            transient=e.code not in PERMANENT_STATUS) from None
         except (urllib.error.URLError, socket.timeout, ConnectionError, OSError) as e:
             raise RtdbError(f'{method} {path}: {getattr(e, "reason", e)}') from None
         if not body:

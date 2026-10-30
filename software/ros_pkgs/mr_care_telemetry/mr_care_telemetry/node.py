@@ -6,9 +6,11 @@
 /base/status(BEST_EFFORT), /phone/trip_command, /phone/location, /safety/sos_request·sos_ack·sos_clear,
 /marker_track(있으면), /joint_states(publish_diag일 때만). 아무것도 발행하지 않는다.
 텔레메트리가 죽거나 느려져도 브리지·베이스 제어에는 영향이 없다(별도 프로세스·systemd 유닛).
+에이전트의 파이썬 logging은 ROS 로거(/rosout, launch 출력, journald)로 옮긴다.
 """
 from __future__ import annotations
 
+import logging
 import os
 import signal
 
@@ -61,10 +63,44 @@ def stamp_ms(t) -> int:
     return t.sec * 1000 + t.nanosec // 1_000_000
 
 
+# 노드에서 로그를 남기는 모듈. 패키지 로거 하나에 달지 않고 모듈 로거마다 단다: launch가 import된 프로세스
+# (launch_testing pytest 플러그인)에서는 logging 계층이 깨져 자식 로거의 부모가 root가 된다.
+PY_LOGGERS = ('mr_care_telemetry.agent', 'mr_care_telemetry.outbox')
+
+
+class RosLogHandler(logging.Handler):
+    """에이전트의 파이썬 logging을 ROS 로거로 보낸다. 이것이 없으면 INFO("RTDB online", 이벤트)는 사라지고
+    ERROR("RTDB rejected …")도 형식 없이 stderr로만 간다(2026-09-27 이전)."""
+
+    def __init__(self, logger):
+        super().__init__()
+        self._logger = logger
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            if record.levelno >= logging.ERROR:
+                self._logger.error(msg)
+            elif record.levelno >= logging.WARNING:
+                self._logger.warning(msg)
+            elif record.levelno >= logging.INFO:
+                self._logger.info(msg)
+            else:
+                self._logger.debug(msg)
+        except Exception:
+            pass
+
+
 class TelemetryNode(Node):
 
     def __init__(self, *, client: RtdbClient | None = None, outbox: Outbox | None = None, **kwargs):
         super().__init__('mr_care_telemetry', **kwargs)
+        self._log_handler = RosLogHandler(self.get_logger())
+        for name in PY_LOGGERS:
+            lg = logging.getLogger(name)
+            lg.addHandler(self._log_handler)
+            lg.setLevel(logging.INFO)
+            lg.propagate = False
         p = self._declare_params()
         cfg = AgentConfig(robot_id=p['robot_id'], display_name=p['display_name'],
                           status_period_s=p['status_period_s'], app_status_stale_s=p['app_status_stale_s'],
@@ -145,6 +181,14 @@ class TelemetryNode(Node):
     def on_bridge_check(self):
         # 브리지가 떠 있으면 /phone/link_status 발행자가 있다(TransientLocal로 항상 광고).
         self.agent.on_bridge_alive(self.count_publishers('/phone/link_status') > 0)
+
+    def destroy_node(self):
+        for name in PY_LOGGERS:
+            lg = logging.getLogger(name)
+            if self._log_handler in lg.handlers:
+                lg.removeHandler(self._log_handler)
+                lg.propagate = True
+        return super().destroy_node()
 
 
 def _raise_interrupt(signum, frame):

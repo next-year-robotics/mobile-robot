@@ -1,9 +1,12 @@
 """TelemetryAgent: 이벤트 매핑·status·sos 노드·오프라인 큐. 메모리 RTDB + 가짜 시계로 전송 스텝을 직접 돈다."""
+import logging
+
 import pytest
 from conftest import FakeClock, MemoryRtdb
 
 from mr_care_telemetry.agent import AgentConfig, TelemetryAgent
 from mr_care_telemetry.outbox import Outbox
+from mr_care_telemetry.rtdb import RtdbError
 
 TRIP = 'bbef019a-dd3a-437e-8f5c-388913ae9eca'
 SOS = '835fcafe-60ac-4517-9f06-50bcd2486b6c'
@@ -277,10 +280,71 @@ def test_prune_keeps_newest(rig):
     assert len(msgs) == 10 and msgs[-1] == 'e14' and 'e4' not in msgs
 
 
-def test_diag_doc(rig):
+def topic_rows(tree, path=()):
+    """대시보드(web/src/lib/diagnostics.ts topicRows)와 같은 읽기 규칙: last_seen_ms가 있는 노드가 잎."""
+    if 'last_seen_ms' in tree:
+        return {'/' + '/'.join(path): tree}
+    rows = {}
+    for k, v in tree.items():
+        rows.update(topic_rows(v, path + (k,)))
+    return rows
+
+
+def test_diag_doc(rig, schemas):
     rig.agent.cfg.publish_diag = True
     rig.agent.on_base_status(agent_state='connected', cmd_watchdog_ok=True)
     rig.step()
     diag = rig.db.at('robots/mr-001/diag')
-    assert set(diag['topics']) == {'/base/status', '/joint_states', '/marker_track', '/robot/app_status'}
-    assert diag['topics']['/base/status']['last_seen_ms'] > 0
+    assert diag is not None, 'diag was not stored (RTDB key rules?)'
+    schemas.check('diag', diag)
+    assert set(diag['topics']) == {'base', 'joint_states', 'marker_track', 'robot'}     # README 3.5 중첩 경로
+    rows = topic_rows(diag['topics'])
+    assert set(rows) == {'/base/status', '/joint_states', '/marker_track', '/robot/app_status'}
+    assert rows['/base/status']['last_seen_ms'] > 0 and rows['/joint_states']['last_seen_ms'] == 0
+    assert 'recent_errors' not in diag                                                 # 오류가 없으면 필드 없음
+    rig.agent._record_error('RTDB write timeout')
+    rig.step(5.0)
+    diag = rig.db.at('robots/mr-001/diag')
+    schemas.check('diag', diag)
+    assert [e['error'] for e in diag['recent_errors']] == ['RTDB write timeout']
+
+
+def test_memory_rtdb_rejects_keys_like_real_rtdb(rig):
+    """2026-09-27 회귀: 옛 계약 모양('/base/status' 키)은 RTDB가 400으로 거절한다. 대역도 같아야 시험이 잡는다."""
+    old = {'updated_at_ms': 1, 'topics': {'/base/status': {'last_seen_ms': 1, 'hz': 1.0}}}
+    with pytest.raises(RtdbError) as ei:
+        rig.db.put('robots/mr-001/diag', old)
+    assert ei.value.status == 400 and not ei.value.transient
+    assert rig.db.at('robots/mr-001/diag') is None                                    # 아무것도 바뀌지 않는다
+    for bad in ({'a.b': 1}, {'x': {'$y': 1}}, {'': 1}, {'l': [{'#': 1}]}):
+        with pytest.raises(RtdbError):
+            rig.db.put('robots/mr-001/x', bad)
+    with pytest.raises(RtdbError):
+        rig.db.patch('robots/mr-001', {'a/b.c': 1})
+    rig.db.patch('robots/mr-001', {'x/y': 1, '-Nabc_09': True})                        # 경로 PATCH·push id는 된다
+    assert rig.db.at('robots/mr-001/x/y') == 1
+
+
+def test_rejected_diag_is_logged_not_hidden(rig, agent_log):
+    """영구 오류(400)는 recent_errors(= diag 안)에만 묻히지 않고 로그 ERROR로 나온다. 같은 오류는 묶는다."""
+    rig.agent.cfg.publish_diag = True
+    rig.db.fail_status['robots/mr-001/diag'] = 400
+    rig.step()
+    rig.step(5.0, n=3)
+    assert len(agent_log.messages(logging.ERROR, 'rejected diag')) == 1          # 처음 한 번
+    rig.step(rig.agent.cfg.error_log_repeat_s)
+    rejected = agent_log.messages(logging.ERROR, 'rejected diag')
+    assert len(rejected) == 2 and '3 more' in rejected[-1]
+    del rig.db.fail_status['robots/mr-001/diag']
+    rig.step(5.0)
+    assert agent_log.messages(logging.INFO, 'accepts diag again')
+    assert rig.agent.online is True                                  # status는 계속 정상
+
+
+def test_rejected_status_keeps_online_and_meta_does_not_block_queue(rig, agent_log):
+    rig.db.fail_status['robots/mr-001/status'] = 400
+    rig.db.fail_status['robots/mr-001/meta'] = 400
+    rig.step()
+    assert agent_log.messages(logging.ERROR, 'rejected status') and agent_log.messages(logging.ERROR, 'rejected meta')
+    assert rig.agent.online is not False and rig.agent._backoff_s == 0
+    assert rig.kinds() == ['agent.online']                           # meta가 거절돼도 이벤트는 나간다

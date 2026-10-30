@@ -5,6 +5,9 @@
 - events·sos: SQLite 큐에 넣고 순서대로 보낸다. 실패하면 1, 2, 4 … 60 s 백오프. `ts_ms`와 push id는 만들 때 정한다.
 - meta: 온라인이 되면 한 번. `first_seen_ms`는 이미 있으면 유지.
 - events 보존: 시작 시와 하루 1회, 로봇당 최대 1000개만 남긴다.
+- diag(publish_diag): 5 s마다 덮어쓴다. 토픽 이름은 RTDB 경로로 펼친다(`/base/status` → `topics/base/status`).
+- RTDB가 400(키 규칙 위반 등)으로 거절한 쓰기는 로그 ERROR로 드러낸다(대상마다 처음 한 번, 그 뒤 5분마다 묶어서).
+  diag.recent_errors에만 넣으면 diag 자체가 거절될 때 아무도 모른다.
 - 이벤트에는 좌표를 넣지 않는다. 폰 위치는 SOS 중에만 `sos/{id}`에 쓰고 sos.clear에서 지운다.
 """
 from __future__ import annotations
@@ -46,6 +49,7 @@ class AgentConfig:
     prune_period_s: float = 86400.0
     ack_debounce_s: float = 1.0
     backoff_max_s: float = 60.0
+    error_log_repeat_s: float = 300.0
     loop_s: float = 0.2
 
 
@@ -93,6 +97,7 @@ class TelemetryAgent:
         self._next_send_at = 0.0
         self._meta_done = False
         self._next_prune_at = 0.0
+        self._rejected: dict[str, dict] = {}     # 영구 오류가 난 대상 → 로그 묶음 상태
 
     # ================================================================ 수명
 
@@ -355,7 +360,10 @@ class TelemetryAgent:
                                 'hz': round(t['count'] / elapsed_s, 1) if elapsed_s > 0 else 0}
                 if name in self.topics:
                     self.topics[name]['count'] = 0
-            return {'updated_at_ms': self.wall_ms(), 'topics': topics, 'recent_errors': list(self.errors)}
+            doc = {'updated_at_ms': self.wall_ms(), 'topics': M.topic_tree(topics)}
+            if self.errors:                  # RTDB는 빈 배열을 저장하지 않는다(README 3.5: 없으면 필드 없음)
+                doc['recent_errors'] = list(self.errors)
+            return doc
 
     # ================================================================ 내부
 
@@ -386,6 +394,23 @@ class TelemetryAgent:
     def _record_error(self, err: Exception | str) -> None:
         with self._lock:
             self.errors.append({'ts_ms': self.wall_ms(), 'source': 'telemetry', 'error': str(err)[:200]})
+
+    def _rejected_write(self, what: str, e: RtdbError) -> None:
+        """RTDB가 영구 오류로 거절한 쓰기. 다시 보내도 같으므로 로그 ERROR로 드러낸다.
+        같은 대상은 처음 한 번, 그 뒤로는 error_log_repeat_s마다 그동안 몇 번 더 났는지와 함께 남긴다."""
+        self._record_error(e)
+        now = self.clock()
+        r = self._rejected.get(what)
+        if r is None or now - r['logged_at'] >= self.cfg.error_log_repeat_s:
+            more = f' ({r["suppressed"]} more since last report)' if r and r['suppressed'] else ''
+            log.error('RTDB rejected %s: %s%s', what, e, more)
+            self._rejected[what] = {'logged_at': now, 'suppressed': 0}
+        else:
+            r['suppressed'] += 1
+
+    def _write_accepted(self, what: str) -> None:
+        if self._rejected.pop(what, None) is not None:
+            log.info('RTDB accepts %s again', what)
 
     def _set_online(self, online: bool, err: Exception | None = None) -> None:
         if online != self.online:
@@ -420,10 +445,7 @@ class TelemetryAgent:
         if self.cfg.publish_diag and now - self._last_diag_at >= self.cfg.diag_period_s:
             elapsed = now - self._last_diag_at if self._last_diag_at > 0 else self.cfg.diag_period_s
             self._last_diag_at = now
-            try:
-                self.client.put(f'{self.root}/diag', self.diag_doc(elapsed))
-            except RtdbError as e:
-                self._record_error(e)
+            self._put_diag(elapsed)
         if now < self._next_send_at:
             return
         if not self._meta_done:
@@ -441,12 +463,28 @@ class TelemetryAgent:
         try:
             self.client.put(f'{self.root}/status', self.status_doc())
         except RtdbError as e:
+            if not e.transient:          # RTDB는 닿았다. 문서가 잘못됐다
+                self._rejected_write('status', e)
+                return
             self._set_online(False, e)
             self._record_error(e)
             return
+        self._write_accepted('status')
         self._set_online(True)
         if self._backoff_s > 0:          # 다시 온라인: 큐를 바로 보낸다
             self._next_send_at = 0.0
+
+    def _put_diag(self, elapsed_s: float) -> None:
+        """최신값만 의미 있다: 실패하면 버린다. 온라인 판정은 status가 한다."""
+        try:
+            self.client.put(f'{self.root}/diag', self.diag_doc(elapsed_s))
+        except RtdbError as e:
+            if e.transient:
+                self._record_error(e)
+            else:
+                self._rejected_write('diag', e)
+            return
+        self._write_accepted('diag')
 
     def _sync_meta(self) -> None:
         try:
@@ -458,7 +496,11 @@ class TelemetryAgent:
                 'first_seen_ms': first if isinstance(first, int) and first > 0 else self.wall_ms()})
             self._meta_done = True
         except RtdbError as e:
-            self._fail(e)
+            if e.transient:
+                self._fail(e)
+            else:                        # 다시 보내도 같다. meta 때문에 큐를 막지 않는다
+                self._rejected_write('meta', e)
+                self._meta_done = True
 
     def _drain(self, now: float) -> None:
         while not self._stop.is_set() or self._flushing:
@@ -473,7 +515,7 @@ class TelemetryAgent:
                         self.outbox.failed(op.id)
                         self._fail(e)
                         return
-                    log.error('dropping %s %s: %s', op.method, op.path, e)
+                    log.error('RTDB rejected %s %s, dropping it from the queue: %s', op.method, op.path, e)
                     self._record_error(e)
                 self.outbox.done(op.id)
                 self._backoff_s = 0.0
@@ -497,7 +539,10 @@ class TelemetryAgent:
             if excess:
                 log.info('pruned %d old event(s)', len(excess))
         except RtdbError as e:
-            self._fail(e)
+            if e.transient:
+                self._fail(e)
+            else:
+                self._rejected_write('events prune', e)
 
     def _final_flush(self) -> None:
         """정지 직전: 백오프를 무시하고 한 번 더 보낸다. 실패하면 큐에 남긴다."""
