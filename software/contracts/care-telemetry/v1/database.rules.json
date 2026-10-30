@@ -2,9 +2,23 @@
   "rules": {
     "robots": {
       "$robot_id": {
-        ".read": "auth != null && root.child('access').child($robot_id).child(auth.uid).exists()",
         ".write": false,
-        "events": { ".indexOn": ["ts_ms", "kind"] }
+        "meta": {
+          ".read": "auth != null && root.child('access').child($robot_id).child(auth.uid).exists()"
+        },
+        "status": {
+          ".read": "auth != null && root.child('access').child($robot_id).child(auth.uid).exists()"
+        },
+        "events": {
+          ".read": "auth != null && root.child('access').child($robot_id).child(auth.uid).exists()",
+          ".indexOn": ["ts_ms", "kind"]
+        },
+        "sos": {
+          ".read": "auth != null && root.child('access').child($robot_id).child(auth.uid).exists()"
+        },
+        "diag": {
+          ".read": "auth != null && root.child('access').child($robot_id).child(auth.uid).val() === 'dev'"
+        }
       }
     },
     "access": {

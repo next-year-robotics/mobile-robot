@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "care-telemetry/1 robots/{robot_id}/diag",
+  "description": "P2 개발자 진단. topics는 ROS 토픽 이름을 '/'마다 한 단계씩 내린 트리다(README 3.5). 잎은 last_seen_ms를 가진 노드.",
+  "type": "object",
+  "required": ["updated_at_ms", "topics"],
+  "properties": {
+    "updated_at_ms": { "type": "integer", "minimum": 0 },
+    "topics": { "$ref": "#/$defs/tree" },
+    "recent_errors": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/error" } }
+  },
+  "$defs": {
+    "leaf": {
+      "type": "object", "required": ["last_seen_ms", "hz"], "additionalProperties": false,
+      "properties": { "last_seen_ms": { "type": "integer", "minimum": 0 }, "hz": { "type": "number", "minimum": 0 } }
+    },
+    "tree": {
+      "type": "object", "minProperties": 1,
+      "not": { "required": ["last_seen_ms"] },
+      "propertyNames": { "pattern": "^[A-Za-z0-9_]{1,255}$" },
+      "additionalProperties": { "anyOf": [ { "$ref": "#/$defs/leaf" }, { "$ref": "#/$defs/tree" } ] }
+    },
+    "error": {
+      "type": "object", "required": ["ts_ms", "source", "error"],
+      "properties": {
+        "ts_ms": { "type": "integer", "minimum": 0 },
+        "source": { "type": "string", "minLength": 1 },
+        "error": { "type": "string", "maxLength": 200 }
+      }
+    }
+  }
+}

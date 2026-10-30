@@ -7,9 +7,24 @@
 각 계약 디렉터리는 schema/*.schema.json 과 fixtures/*.json 을 가진다.
 phone-bridge는 fixtures/*.json 을 schema/messages.schema.json 으로,
 care-telemetry는 fixtures/<name>.json 을 schema/<name 앞부분>.schema.json 으로 검증한다.
+database.rules.json 이 있는 계약(= RTDB에 쓰는 계약)은 fixture의 모든 객체 키가 RTDB 키 규칙을 지키는지도 본다
+(비어 있지 않음, . $ # [ ] / 와 제어 문자 금지, UTF-8 768바이트 이하). 어기면 RTDB가 쓰기 전체를 400으로 거절한다.
 """
-import json, sys, pathlib
+import json, re, sys, pathlib
 from jsonschema import Draft202012Validator
+
+RTDB_KEY_BAD = re.compile(r'[.$#\[\]/\x00-\x1f\x7f]')
+
+def rtdb_key_errors(node, path=()):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            here = path + (k,)
+            if not k or RTDB_KEY_BAD.search(k) or len(k.encode('utf-8')) > 768:
+                yield f"{'/'.join(map(str, path)) or '<root>'}: invalid RTDB key {k!r}"
+            yield from rtdb_key_errors(v, here)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from rtdb_key_errors(v, path + (i,))
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -28,6 +43,7 @@ def validate_dir(cdir: pathlib.Path) -> int:
         print(f"skip {cdir} (schema {len(schemas)}, fixtures {len(fixtures)})")
         return 0
     failures = 0
+    rtdb = (cdir / "database.rules.json").is_file()
     for fx in fixtures:
         if "messages" in schemas:
             schema = schemas["messages"]
@@ -39,12 +55,16 @@ def validate_dir(cdir: pathlib.Path) -> int:
                 failures += 1
                 continue
         v = Draft202012Validator(schema)
-        errs = sorted(v.iter_errors(load(fx)), key=lambda e: e.path)
+        doc = load(fx)
+        errs = [f"{'/'.join(map(str, e.absolute_path)) or '<root>'}: {e.message[:160]}"
+                for e in sorted(v.iter_errors(doc), key=lambda e: e.path)]
+        if rtdb:
+            errs += list(rtdb_key_errors(doc))
         if errs:
             failures += 1
             print(f"  FAIL {rel(fx)}")
             for e in errs[:3]:
-                print(f"       - {'/'.join(map(str, e.absolute_path)) or '<root>'}: {e.message[:160]}")
+                print(f"       - {e}")
         else:
             print(f"  ok   {rel(fx)}")
     return failures
