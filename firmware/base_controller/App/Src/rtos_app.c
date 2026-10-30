@@ -20,12 +20,17 @@
 #include "app_config.h"
 #include "app_link.h"
 #include "app_main.h"
+#include "battery_monitor.h"
 #include "control_core.h"
 #include "control_types.h"
 #include "health_policy.h"
+#include "imu_app.h"
 #include "main.h"
 #include "motor_safety.h"
+#include "platform_adc.h"
 #include "platform_stm32.h"
+
+#include <math.h>
 
 #if U3_SMOKE_TEST
 #include "line_builder.h"
@@ -67,6 +72,12 @@ static TaskHandle_t s_control_task;
 static TaskHandle_t s_health_task;
 static TaskHandle_t s_io_task;
 
+/* ImuTask (P4). 본체는 imu_app.c에 있다. MicroRosTask와 같은 방식으로 정적 메모리와
+   생성만 여기서 소유한다. */
+static StackType_t  s_imu_stack[TASK_STACK_WORDS_IMU];
+static StaticTask_t s_imu_tcb;
+static TaskHandle_t s_imu_task;
+
 #if U3_SMOKE_TEST
 /* SmokeTask는 U3 전용이다. HealthTask의 stack 계측이 task 본체보다 앞에 있어
    handle을 여기 둔다. */
@@ -102,6 +113,12 @@ static uint8_t       s_cmdvel_storage[sizeof(control_command_t)];
 static StaticQueue_t s_cmdvel_queue_cb;
 static QueueHandle_t s_cmdvel_queue;
 
+/* ImuTask → MicroRosTask 표본 mailbox. 길이 1 overwrite / peek. 표본이 float 일곱 개와
+   시각이라 한 word로 옮길 수 없다. */
+static uint8_t       s_imu_storage[sizeof(imu_sample_t)];
+static StaticQueue_t s_imu_queue_cb;
+static QueueHandle_t s_imu_queue;
+
 /* idle/timer task 메모리. 생성 wrapper의 weak 기본 구현에 기대지 않는다. */
 static StackType_t  s_idle_stack[TASK_STACK_WORDS_IDLE];
 static StaticTask_t s_idle_tcb;
@@ -110,6 +127,11 @@ static StaticTask_t s_timer_tcb;
 
 static control_core_t  s_core;
 static health_monitor_t s_health;
+
+/* HealthTask가 쓰고 MicroRosTask가 읽는다. float 한 word라 잠금이 필요 없다. NaN이면
+   측정할 수 없다는 뜻이다. */
+static battery_monitor_t s_battery;
+static volatile float    s_supply_voltage;
 
 /* ISR/task가 함께 OR로 쌓는 단일 word. 소비는 ControlTask 하나뿐이다. */
 static volatile uint32_t s_pending_fault_flags;
@@ -296,6 +318,29 @@ void app_link_notify_io_from_isr(void)
 
   (void)xTaskNotifyFromISR(s_io_task, IO_NOTIFY_RX, eSetBits, &woken);
   portYIELD_FROM_ISR(woken);
+}
+
+bool app_link_post_imu(const imu_sample_t *sample)
+{
+  if (s_imu_queue == NULL)
+  {
+    return false;
+  }
+  return xQueueOverwrite(s_imu_queue, sample) == pdPASS;
+}
+
+bool app_link_get_imu(imu_sample_t *out)
+{
+  if (s_imu_queue == NULL)
+  {
+    return false;
+  }
+  return xQueuePeek(s_imu_queue, out, 0U) == pdTRUE;
+}
+
+float app_link_get_supply_voltage(void)
+{
+  return s_supply_voltage;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -490,6 +535,71 @@ static void health_collect_stacks(void)
   g_rtos_metrics.stack_free_micro_ros_words =
       (uint32_t)uxTaskGetStackHighWaterMark(s_micro_ros_task);
 #endif
+  g_rtos_metrics.stack_free_imu_words =
+      (uint32_t)uxTaskGetStackHighWaterMark(s_imu_task);
+}
+
+/**
+  * @brief  배터리 전압 표본 하나. 50 ms마다 HealthTask에서 부른다.
+  * @note   ADC1의 유일한 호출 지점이다. 두 변환 합계 약 50 µs로 IWDG refresh 판정을
+  *         밀어내지 않는다.
+  */
+static void health_sample_battery(void)
+{
+  uint16_t raw_battery = 0U;
+  uint16_t raw_vrefint = 0U;
+  uint16_t cal = platform_adc_vrefint_cal();
+  bool ok = platform_adc_read_battery(&raw_battery, &raw_vrefint);
+
+  battery_monitor_update(&s_battery, ok, raw_battery, raw_vrefint, cal);
+  s_supply_voltage = battery_monitor_volts_or_nan(&s_battery);
+
+  g_rtos_metrics.bat_valid = s_battery.valid ? 1U : 0U;
+  g_rtos_metrics.bat_mv = s_battery.valid ? (uint32_t)(s_battery.volts * 1000.0f) : 0U;
+  g_rtos_metrics.bat_last_mv = (uint32_t)(s_battery.last_volts * 1000.0f);
+  g_rtos_metrics.bat_vdda_mv = s_battery.vdda_mv;
+  g_rtos_metrics.bat_raw = raw_battery;
+  g_rtos_metrics.bat_vrefint_raw = raw_vrefint;
+  g_rtos_metrics.bat_vrefint_cal = cal;
+  g_rtos_metrics.bat_sample_count = s_battery.sample_count;
+  g_rtos_metrics.bat_reject_count = s_battery.reject_count;
+  g_rtos_metrics.bat_last_reject = s_battery.last_reject;
+}
+
+static void health_collect_imu(void)
+{
+  imu_app_metrics_t imu;
+
+  imu_app_get_metrics(&imu);
+  g_rtos_metrics.imu_ready = imu.ready;
+  g_rtos_metrics.imu_init_attempts = imu.init_attempts;
+  g_rtos_metrics.imu_init_status = imu.init_status;
+  g_rtos_metrics.imu_reinit_count = imu.reinit_count;
+  g_rtos_metrics.imu_who_am_i = imu.who_am_i;
+  g_rtos_metrics.imu_fail_reg = imu.fail_reg;
+  g_rtos_metrics.imu_fail_wrote = imu.fail_wrote;
+  g_rtos_metrics.imu_fail_read = imu.fail_read;
+  g_rtos_metrics.imu_sample_count = imu.sample_count;
+  g_rtos_metrics.imu_invalid_count = imu.invalid_count;
+  g_rtos_metrics.imu_read_fail_count = imu.read_fail_count;
+  g_rtos_metrics.imu_spi_error_count = imu.spi_error_count;
+  g_rtos_metrics.imu_drdy_count = imu.drdy_count;
+  g_rtos_metrics.imu_drdy_timeout_count = imu.drdy_timeout_count;
+  g_rtos_metrics.imu_drdy_missed_count = imu.drdy_missed_count;
+  g_rtos_metrics.imu_stale_read_count = imu.stale_read_count;
+  g_rtos_metrics.imu_bias_valid = imu.bias_valid;
+  g_rtos_metrics.imu_bias_update_count = imu.bias_update_count;
+  g_rtos_metrics.imu_bias_reject_count = imu.bias_reject_count;
+  g_rtos_metrics.imu_bias_x_mdps = imu.bias_mdps[0];
+  g_rtos_metrics.imu_bias_y_mdps = imu.bias_mdps[1];
+  g_rtos_metrics.imu_bias_z_mdps = imu.bias_mdps[2];
+  g_rtos_metrics.imu_gyro_x_mdps = imu.gyro_mdps[0];
+  g_rtos_metrics.imu_gyro_y_mdps = imu.gyro_mdps[1];
+  g_rtos_metrics.imu_gyro_z_mdps = imu.gyro_mdps[2];
+  g_rtos_metrics.imu_accel_x_mg = imu.accel_mg[0];
+  g_rtos_metrics.imu_accel_y_mg = imu.accel_mg[1];
+  g_rtos_metrics.imu_accel_z_mg = imu.accel_mg[2];
+  g_rtos_metrics.imu_temp_cdeg = imu.temp_cdeg;
 }
 
 static void health_iwdg_refresh(void)
@@ -520,6 +630,10 @@ static void health_task(void *argument)
 
   /* MX_IWDG_Init()에서 scheduler 전에 시작된 counter를 HealthTask가 인수한다. */
   health_iwdg_refresh();
+
+  /* 이 task가 ADC1의 유일한 소유자다. 실패해도 매 주기 다시 변환하므로 진행한다.
+     bat_reject_count가 그 사실을 드러낸다. */
+  (void)platform_adc_start();
 
   for (;;)
   {
@@ -608,9 +722,16 @@ static void health_task(void *argument)
       g_rtos_metrics.mr_uart1_rx_overflow_count = mr.uart1_rx_overflow_count;
       g_rtos_metrics.mr_uart1_rearm_count = mr.uart1_rearm_count;
       g_rtos_metrics.mr_uart1_tx_fail_count = mr.uart1_tx_fail_count;
+      g_rtos_metrics.mr_imu_count = mr.imu_count;
+      g_rtos_metrics.mr_imu_fail_count = mr.imu_fail_count;
+      g_rtos_metrics.mr_imu_held_count = mr.imu_held_count;
+      g_rtos_metrics.mr_imu_stale_count = mr.imu_stale_count;
+      g_rtos_metrics.mr_imu_skipped_count = mr.imu_skipped_count;
     }
 #endif
 
+    health_sample_battery();
+    health_collect_imu();
     health_collect_stacks();
 
     if ((uint32_t)(now_ms - last_led_ms) >= LD2_TOGGLE_PERIOD_MS)
@@ -868,6 +989,8 @@ static void smoke_task(void *argument)
 void rtos_app_init(void)
 {
   s_pending_fault_flags = 0U;
+  battery_monitor_init(&s_battery);
+  s_supply_voltage = NAN;
   g_control_tick_seq = 0U;
   g_control_tick_cycles = 0U;
   g_iwdg_test_stall_control = 0U;
@@ -890,9 +1013,12 @@ void rtos_app_init(void)
                                       s_status_storage, &s_status_queue_cb);
   s_cmdvel_queue = xQueueCreateStatic(1U, sizeof(control_command_t),
                                       s_cmdvel_storage, &s_cmdvel_queue_cb);
+  s_imu_queue = xQueueCreateStatic(1U, sizeof(imu_sample_t),
+                                   s_imu_storage, &s_imu_queue_cb);
 
   if ((s_cmd_queue == NULL) || (s_result_queue == NULL) ||
-      (s_status_queue == NULL) || (s_cmdvel_queue == NULL))
+      (s_status_queue == NULL) || (s_cmdvel_queue == NULL) ||
+      (s_imu_queue == NULL))
   {
     Error_Handler();
   }
@@ -912,8 +1038,12 @@ void rtos_app_init(void)
   s_io_task = xTaskCreateStatic(legacy_io_task, "LegacyIo",
                                 TASK_STACK_WORDS_IO, NULL,
                                 TASK_PRIO_LEGACY_IO, s_io_stack, &s_io_tcb);
+  s_imu_task = xTaskCreateStatic(imu_task, "Imu",
+                                 TASK_STACK_WORDS_IMU, NULL,
+                                 TASK_PRIO_IMU, s_imu_stack, &s_imu_tcb);
 
-  if ((s_control_task == NULL) || (s_health_task == NULL) || (s_io_task == NULL))
+  if ((s_control_task == NULL) || (s_health_task == NULL) || (s_io_task == NULL) ||
+      (s_imu_task == NULL))
   {
     Error_Handler();
   }

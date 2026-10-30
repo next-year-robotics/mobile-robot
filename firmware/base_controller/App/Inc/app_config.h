@@ -164,6 +164,98 @@
    링크는 살아 있다. */
 #define CMD_VEL_FRAME_ID_CAP        32U
 
+/* `/imu/data_raw`의 header.frame_id. 센서 축 그대로 싣는다. 로봇 축으로 돌리는 일은
+   URDF의 `imu_link` 장착 자세가 한다(REP-145). 펌웨어에서 축을 바꿔 끼우면 장착을
+   바꿀 때마다 재플래시가 필요해진다. */
+#define IMU_FRAME_ID                "imu_link"
+
+/* 샘플 시각에서 이만큼 지난 IMU 표본은 발행하지 않는다. 정상은 2 ms(MicroRosTask
+   주기) 안팎이다. 여기에 닿았다면 MicroRosTask가 송신에 묶여 있던 것이다. 늦은
+   요레이트를 정확한 과거 시각으로 내보내면 EKF가 그만큼 되감아야 한다. */
+#define IMU_MAX_AGE_MS              50U
+
+/* ---- IMU (ICM-42688-P, SPI2) ----
+   upgrade_plan.md 5절. 얻으려는 것은 z축 요레이트 하나다. 축 수나 온보드 융합이 아니라
+   bias 안정성이 기준이다. */
+
+/* ImuTask는 HealthTask와 같은 우선순위다.
+     - MicroRosTask(P3)보다 높아야 하는 이유: MicroRosTask는 MTU 하나를 5.6 ms 동안
+       블로킹 송신한다. 그 아래에 있으면 데이터 레지스터가 다음 표본으로 덮인 뒤에
+       읽게 되고, 이전 DRDY 시각이 새 데이터에 붙는다(10 ms 어긋남).
+     - HealthTask(P4)보다 높으면 안 되는 이유: SPI 버그로 ImuTask가 CPU를 붙잡으면
+       IWDG가 굶는다. 같은 우선순위면 time slicing이 HealthTask 몫을 보장한다.
+   한 표본의 일은 SPI 18 B(약 55 µs)와 float 몇 개라 HealthTask를 밀어내지 않는다. */
+#define TASK_PRIO_IMU               4U
+#define TASK_STACK_WORDS_IMU      384U  /* 1,536 B */
+
+/* 센서 ODR과 이 주기가 같아야 한다. ODR이 더 높으면 읽지 않은 표본이 사라지고,
+   UI 필터가 그만큼 대역을 넓혀 두었으므로 그 성분이 접힌다. */
+#define IMU_ODR_HZ                100U
+#define IMU_SAMPLE_PERIOD_MS       10U
+
+/* DRDY(INT1) 대기 상한. 2.5 주기를 넘기면 INT1 없이 직접 읽고 stamp를 읽은 시각으로
+   단다. INT1 배선이 죽어도 데이터는 나오게 하되, 정확도가 떨어진 것은
+   `imu_drdy_timeout_count`로 드러낸다. */
+#define IMU_DRDY_TIMEOUT_MS        25U
+
+/* 초기화 실패 뒤 재시도 간격. 모듈이 빠져 있어도 1초에 한 번만 버스를 건드린다. */
+#define IMU_INIT_RETRY_MS        1000U
+
+/* 켠 직후 버리는 표본 수. 자이로 기동 30 ms(데이터시트 표 1) + 2차 UI 필터 군지연
+   12.9 ms(ODR 100 Hz, BW 인덱스 5)를 덮는다. */
+#define IMU_STARTUP_DISCARD         5U
+
+/* WHO_AM_I와 PWR_MGMT0을 다시 읽어 IMU가 그대로인지 보는 주기. MCU만 리셋되거나
+   IMU만 브라운아웃되면 레지스터가 기본값(센서 꺼짐)으로 돌아가는데, 데이터
+   레지스터는 마지막 값을 쥐고 있어 그럴듯한 숫자가 계속 나온다. */
+#define IMU_CHECK_PERIOD_MS      1000U
+
+/* SPI 연속 실패 허용치. 넘으면 재초기화한다. */
+#define IMU_BUS_FAIL_LIMIT          3U
+
+/* HAL_SPI_TransmitReceive 타임아웃. 18 B는 2.625 MHz에서 55 µs다. */
+#define IMU_SPI_TIMEOUT_MS          2U
+
+/* 자이로 bias 재추정 창. 바퀴가 멈춰 있는 동안 이만큼 모이면 평균을 bias로 쓴다.
+   2 s 평균의 잡음은 0.0143 °/s / √200 ≈ 0.001 °/s로 bias 공차(±0.5 °/s)보다
+   세 자리 작다. */
+#define IMU_BIAS_WINDOW_SAMPLES   200U
+
+/* 창 안에서 축마다 허용하는 (최대 - 최소). 0.5 °/s다. 2 s 창에서 백색잡음의 봉우리
+   폭은 약 ±3σ = 0.086 °/s라 여유가 6배다. 바퀴는 멈췄는데 이걸 넘는다면 누가 로봇을
+   들어 돌리고 있다. */
+#define IMU_BIAS_MAX_SPREAD_RADPS 0.00873f
+
+/* ---- 배터리 전압 (ADC1_IN4, PA4) ---- */
+
+/* BAT_DIV → VB_LOGIC 배율. 설계는 (100 k + 22 k) / 22 k = 5.545인데 실측이
+   13.0 V / 2.16 V = 6.02다(base_interface_revB.md 2절, 2026-10-29). 1 % 저항으로
+   설명되지 않는 7.8 % 차이라 R1/R2 실물 확인이 남아 있다. 원인이 밝혀져 저항을
+   바꾸면 여기도 바꾼다. */
+#define BAT_DIVIDER_GAIN           6.02f
+
+/* VREFINT 공장 보정값을 잰 조건. F446 데이터시트 표 "Internal reference voltage
+   calibration values", LL의 VREFINT_CAL_VREF와 같다. */
+#define BAT_VREFINT_CAL_MV         3300U
+
+/* VREFINT로 역산한 VDDA가 이 범위를 벗어나면 그 표본을 버린다. NUCLEO 3V3은 실측
+   3.23 V다. 범위 밖이면 VREFINT 변환이 깨진 것이고 배터리 값도 믿을 수 없다. */
+#define BAT_VDDA_MIN_MV            2900U
+#define BAT_VDDA_MAX_MV            3600U
+
+/* 1차 저역 필터. HealthTask 50 ms 표본에서 시정수 약 1 s다. 모터 기동 전류로 생기는
+   순간 처짐을 평균으로 누른다. 저전압 판정을 붙인다면 처짐 자체를 봐야 하니 그때는
+   필터 전 값을 따로 쓴다. */
+#define BAT_FILTER_ALPHA           0.05f
+
+/* 이만큼 연속으로 표본을 버리면 `supply_voltage`를 NaN으로 내린다. 1 s다. 한두 번의
+   변환 실패로 값이 깜빡이지 않게 하되, ADC가 죽었는데 마지막 값이 계속 나가게 두지
+   않는다. */
+#define BAT_REJECT_LIMIT           20U
+
+/* HAL_ADC_PollForConversion 타임아웃. 한 변환은 (480 + 12) / 21 MHz = 23 µs다. */
+#define BAT_ADC_TIMEOUT_MS          2U
+
 /* ---- 엔코더 ---- */
 
 /* 로봇 전진 시 좌우 누적 틱이 모두 +가 되게 하는 보정. 두 바퀴가 마주 보게 달려 있어
@@ -322,6 +414,26 @@ _Static_assert(TX_LINE_CAP >= TX_WORST_SPD_LINE_LEN,
                "TX_LINE_CAP이 최악의 spd 줄보다 작다");
 _Static_assert(VEL_TARGET_MAX_TPS > 0 && VEL_TARGET_MAX_TPS <= 8000,
                "vel 목표 상한이 모터의 물리 상한 밖이다");
+_Static_assert(TASK_PRIO_IMU > TASK_PRIO_MICRO_ROS,
+               "ImuTask가 MicroRosTask 아래면 블로킹 송신 동안 표본이 덮이고 stamp가 어긋난다");
+_Static_assert(TASK_PRIO_IMU <= TASK_PRIO_HEALTH,
+               "ImuTask가 HealthTask보다 높으면 SPI 고장이 IWDG를 굶길 수 있다");
+_Static_assert(TASK_PRIO_CONTROL > TASK_PRIO_IMU,
+               "ImuTask가 ControlTask를 막으면 안 된다");
+_Static_assert(IMU_SAMPLE_PERIOD_MS * IMU_ODR_HZ == 1000U,
+               "IMU 주기와 센서 ODR이 갈리면 표본이 사라지거나 중복된다");
+_Static_assert(IMU_DRDY_TIMEOUT_MS > (2U * IMU_SAMPLE_PERIOD_MS),
+               "DRDY 대기가 두 주기보다 짧으면 정상 지터에서도 fallback으로 빠진다");
+_Static_assert(IMU_MAX_AGE_MS > MICRO_ROS_POLL_MS,
+               "IMU 나이 상한이 MicroRosTask 주기보다 짧으면 정상 표본도 버린다");
+_Static_assert(IMU_BIAS_WINDOW_SAMPLES >= IMU_ODR_HZ,
+               "bias 창이 1초보다 짧으면 평균 잡음이 bias 공차에 가까워진다");
+_Static_assert(BAT_FILTER_ALPHA > 0.0f && BAT_FILTER_ALPHA <= 1.0f,
+               "배터리 필터 계수는 (0, 1] 범위다");
+_Static_assert(BAT_VDDA_MIN_MV < BAT_VREFINT_CAL_MV && BAT_VREFINT_CAL_MV < BAT_VDDA_MAX_MV,
+               "VDDA 허용 범위가 공장 보정 조건(3.3 V)을 포함하지 않는다");
+_Static_assert(BAT_DIVIDER_GAIN > 1.0f,
+               "분압 배율은 1보다 크다 (BAT_DIV는 VB_LOGIC보다 낮다)");
 
 /* 게인 범위. 폐루프에서 부호가 틀리면 튜닝으로 나타나지 않고 첫 지령에서 폭주한다.
    음의 게인은 그 자체로 양의 피드백이므로 컴파일에서 막는다. */

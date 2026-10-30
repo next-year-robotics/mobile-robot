@@ -25,3 +25,7 @@ bool    saturated_right
 # 제어 루프 건전성
 uint32 loop_count            # TIM6 틱 누적
 uint32 loop_overruns         # 이전 루프가 안 끝난 상태로 다음 틱이 온 횟수
+
+# 배터리 (VB_LOGIC). ADC1_IN4를 VREFINT로 보정하고 시정수 약 1 s로 거른 값이다.
+# 측정할 수 없으면 NaN이다(ADC 실패, VDDA 이상, 입력 포화가 1 s 이어질 때). 0이 아니다.
+float32 supply_voltage       # [V]

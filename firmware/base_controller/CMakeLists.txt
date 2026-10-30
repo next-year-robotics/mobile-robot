@@ -79,10 +79,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/speed_control.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/control_ack.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/health_policy.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/battery_monitor.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/imu_bias.c
+    # IMU 레지스터 드라이버. 버스는 platform_imu.h를 거치고 host에서 fake로 시험한다.
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/icm42688.c
     # orchestration + STM32/RTOS adapter
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/app_main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_stm32.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_uart1.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_imu.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/platform_adc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/imu_app.c
     ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rtos_app.c
 )
 
@@ -134,9 +141,13 @@ set(APP_SOURCES
     App/Src/control_core.c
     App/Src/control_ack.c
     App/Src/health_policy.c
+    App/Src/battery_monitor.c
+    App/Src/imu_bias.c
+    App/Src/icm42688.c
     App/Src/app_main.c
     App/Src/platform_stm32.c
     App/Src/platform_uart1.c
+    App/Src/platform_adc.c
     Core/Src/main.c
     Core/Src/stm32f4xx_it.c
 )
@@ -158,10 +169,12 @@ if(MICRO_ROS)
                  APPEND PROPERTY COMPILE_OPTIONS -Wall -Wextra -Wshadow)
 endif()
 
-# rtos_app.c만 -Wundef를 뺀다. FreeRTOS 헤더가 정의되지 않은 config 매크로를
-# #if로 검사하는 자리가 있어 application 코드의 문제가 아닌 경고가 뜬다.
-set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/rtos_app.c
-             APPEND PROPERTY COMPILE_OPTIONS -Wall -Wextra -Wshadow -Wformat=2)
+# FreeRTOS 헤더를 들이는 파일은 -Wundef를 뺀다. FreeRTOS 헤더가 정의되지 않은 config
+# 매크로를 #if로 검사하는 자리가 있어 application 코드의 문제가 아닌 경고가 뜬다.
+foreach(rtos_source IN ITEMS rtos_app.c imu_app.c platform_imu.c)
+    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/App/Src/${rtos_source}
+                 APPEND PROPERTY COMPILE_OPTIONS -Wall -Wextra -Wshadow -Wformat=2)
+endforeach()
 foreach(app_source IN LISTS APP_SOURCES)
     set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/${app_source}
                  APPEND PROPERTY COMPILE_OPTIONS ${APP_WARNING_FLAGS})
