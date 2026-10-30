@@ -4,6 +4,7 @@
                     │  enable 실패/시간 초과 → error
     starting/active ─cancel→ cancelling ─disable 성공 + 정지 확인→ cancelled ─3 s→ idle
                                    │ disable 실패 반복/정지 미확인 → error
+    starting/active ─abort(안전 정지)→ cancelling ─(멈춤과 같은 확인)→ error(사유)   자동 재개 없음
     arrived는 OPEN-N1(도착 판정 수단) 결정 전까지 절대 내지 않는다.
 
 - 정지는 거절하지 않는다. 어떤 상태에서 cancel이 와도 follow disable을 보낸다.
@@ -56,6 +57,7 @@ class Mission:
         self._still_since: float | None = None
         self._marker: int | None = None
         self._marker_at = 0.0
+        self._abort_msg: str | None = None   # 안전 정지 중이면 끝낼 때 쓸 error 문구
         self.log: list[str] = []       # 노드가 비워 가며 로그로 옮긴다
 
     # ------------------------------------------------------------ 입력
@@ -66,6 +68,7 @@ class Mission:
             return []
         self.trip_id, self.from_place_id, self.to_place_id = trip_id, from_place_id, to_place_id
         self.last_error = None
+        self._abort_msg = None
         self._acquired = False
         self._set('starting', now)
         return [('enable', True)]
@@ -73,12 +76,26 @@ class Mission:
     def cancel(self, now: float, trip_id: str) -> list:
         if trip_id and self.trip_id and trip_id != self.trip_id:
             self.log.append(f'cancel for {trip_id} while current trip is {self.trip_id}: stopping anyway')
+        self._abort_msg = None          # 안전 정지 중에 사용자가 멈춤을 눌렀다: 보통 멈춤으로 끝낸다
         if self.state == 'cancelling':
             return []
         if self.state in ('starting', 'active', 'error'):
             self._set('cancelling', now)
             self._disable_ok_at = None
             self._still_since = None
+        return self._request_disable(now)
+
+    def abort(self, now: float, message: str) -> list:
+        """안전 정지(M3 D4: SOS에 폰 무응답). 멈춤과 같은 경로(follow disable + 정지 확인)로 세우고
+        끝은 `error`(message)다. 마커가 다시 보여도 따라가지 않는다. 다시 가려면 앱에서 새로 출발한다.
+        주행 중(starting/active)이 아니면 아무것도 안 한다."""
+        if self.state not in ('starting', 'active'):
+            return []
+        self.log.append(f'safety stop of trip {self.trip_id}: {message}')
+        self._abort_msg = message
+        self._set('cancelling', now)
+        self._disable_ok_at = None
+        self._still_since = None
         return self._request_disable(now)
 
     def enable_result(self, now: float, want: bool, ok: bool, detail: str = '') -> list:
@@ -126,9 +143,14 @@ class Mission:
             return self._request_disable(now)
         if self.state == 'cancelling':
             if self._disable_ok_at is not None and self._stopped(now):
-                self._set('cancelled', now)
+                if self._abort_msg is not None:
+                    self._fail(now, self._abort_msg)
+                    self._abort_msg = None
+                else:
+                    self._set('cancelled', now)
                 return []
             if now - self._entered > c.stop_timeout_s:
+                self._abort_msg = None
                 self._fail(now, MSG_STOP_UNCONFIRMED)
                 return []
             if self._disable_ok_at is None and not self._disable_pending and self._next_disable_at is not None \
@@ -142,11 +164,14 @@ class Mission:
     # ------------------------------------------------------------ 출력
 
     def tracking_state(self, now: float) -> str:
+        """PROTOCOL 9.7 표. following·searching·lost는 주행 중(starting/active)에만, 그 밖에서는 idle(2026-09-27)."""
         if self._marker is None or now - self._marker_at > self.cfg.marker_stale_s:
             return 'unavailable'
+        if self.state not in ('starting', 'active'):
+            return 'idle'
         if self._marker in (MARKER_TRACKING, MARKER_HOLDING):
             return 'following'
-        if self.state == 'starting' or (self.state == 'active' and not self._acquired):
+        if self.state == 'starting' or not self._acquired:
             return 'searching'
         return 'lost'
 

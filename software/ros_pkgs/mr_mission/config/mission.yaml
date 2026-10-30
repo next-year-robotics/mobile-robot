@@ -14,3 +14,12 @@ mr_mission:
     marker_stale_s: 1.0
     odom_topic: "/odom"
     marker_track_topic: "/marker_track"
+    # SOS 판단(M3, docs/senior-care/m3-safety-design.md — 2026-09-27 사용자 결정)
+    sos_enabled: true
+    sos_lost_s: 10.0                  # 주행 중·획득 후 LOST(또는 marker_track 끊김)가 이만큼 → /safety/sos_request
+    sos_recover_s: 5.0                # 마커를 이만큼 연속으로 다시 잡으면 → /safety/sos_clear(tracking_recovered)
+    sos_stop_on_no_ack: true          # 폰이 SOS에 끝내 응답 안 하면 follow를 끄고 trip을 error로(자동 재개 없음)
+    # 앱 연결 끊김(D6, 2026-09-27 사용자 결정): 주행 중 /phone/link_status가 이만큼 연속 끊기면 follow를 끄고 trip을 error로
+    # ("폰 연결이 끊겨 멈췄어요", 자동 재개 없음). 브리지가 알아챈 때부터 센다(응답 없이 사라진 앱은 heartbeat 10 s가 앞에 붙는다). 0.0이면 끔
+    link_lost_stop_s: 30.0
+    link_stale_s: 12.0                # connected=true가 이만큼 재발행 안 되면(브리지는 5 s마다) 끊김으로 본다(브리지 프로세스 죽음)
