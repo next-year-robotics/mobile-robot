@@ -28,7 +28,13 @@ base_link -> camera optical:      [0.250,  0.000, 0.360] m
 base_link -> left wheel centre:   [0.000, +0.132, 0.000] m
 base_link -> right wheel centre:  [0.000, -0.132, 0.000] m
 camera mount RPY:                 [0.0, 0.0, 0.0] deg
+base_link -> imu_link:            [0.000,  0.000, 0.050] m  (provisional)
+imu mount RPY:                    [0.0, 0.0, 0.0] deg      (provisional)
 ```
+
+`imu_link` is a placeholder until the base interface board is mounted in its
+final place. Only "sensor +Z points up" has been measured (+1003 mg at rest on
+2026-10-30). Replace both lines with measured values after installation.
 
 The camera optical centre is therefore 410 mm above the floor and 250 mm in
 front of the drive axle. It is centred laterally and looks straight forward.

@@ -25,6 +25,8 @@ def _xacro_mappings(params: dict) -> dict[str, str]:
     chassis_size = params["chassis_frame_size_m"]
     chassis_centre = params["chassis_frame_centre_from_base_link_m"]
     mesh_origin = params["cart_frame_mesh_origin_from_base_link_m"]
+    imu_xyz = params["imu_xyz_m"]
+    imu_rpy = [radians(value) for value in params["imu_rpy_deg"]]
     return {
         "base_link_z": _number(params["base_link_z_m"]),
         "camera_x": _number(camera_xyz[0]),
@@ -52,6 +54,12 @@ def _xacro_mappings(params: dict) -> dict[str, str]:
         "chassis_mass": _number(params["chassis_mass_kg"]),
         "wheel_mass": _number(params["wheel_mass_kg"]),
         "camera_mass": _number(params["camera_mass_kg"]),
+        "imu_x": _number(imu_xyz[0]),
+        "imu_y": _number(imu_xyz[1]),
+        "imu_z": _number(imu_xyz[2]),
+        "imu_roll": _number(imu_rpy[0]),
+        "imu_pitch": _number(imu_rpy[1]),
+        "imu_yaw": _number(imu_rpy[2]),
     }
 
 

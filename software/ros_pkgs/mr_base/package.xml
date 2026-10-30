@@ -3,7 +3,7 @@
 <package format="3">
   <name>mr_base</name>
   <version>0.1.0</version>
-  <description>휠 오도메트리와 odom -> base_footprint TF.</description>
+  <description>휠 오도메트리, odom -> base_footprint TF, IMU 공분산 중계.</description>
   <maintainer email="seongho06@khu.ac.kr">emjdp</maintainer>
   <license>Apache-2.0</license>
 
