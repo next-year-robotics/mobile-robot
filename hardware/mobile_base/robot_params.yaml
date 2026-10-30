@@ -22,6 +22,12 @@ wheel_separation_m:   0.264
 wheel_radius_m:       0.050
 wheel_width_m:        0.024
 
+# --- IMU frame (imu_link), PROVISIONAL until the interface board is mounted ---
+# Placeholder at the drive-axle midpoint, 50 mm up. Only sensor +Z = up is
+# measured; X/Y yaw alignment is unchecked. Replace after installation.
+imu_xyz_m:            [0.000, 0.000, 0.050]
+imu_rpy_deg:          [0.0, 0.0, 0.0]
+
 # --- Measured total mass and URDF link-mass budget ---
 # The three link classes below sum to the measured 9.8 kg total.  The chassis
 # allocation includes the frame, casters, spring drives, motors, and hardware.

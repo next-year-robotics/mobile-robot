@@ -63,6 +63,7 @@ def test_link_and_joint_contract(robot: ET.Element) -> None:
         "right_wheel_link",
         "camera_link",
         "camera_optical_frame",
+        "imu_link",
     }
     assert _joint(robot, "left_wheel_joint").attrib["type"] == "continuous"
     assert _joint(robot, "right_wheel_joint").attrib["type"] == "continuous"
@@ -118,6 +119,19 @@ def test_camera_optical_axes(robot: ET.Element) -> None:
     assert _column(rotation, 0) == pytest.approx([0.0, -1.0, 0.0], abs=1.0e-9)  # right
     assert _column(rotation, 1) == pytest.approx([0.0, 0.0, -1.0], abs=1.0e-9)  # down
     assert _column(rotation, 2) == pytest.approx([1.0, 0.0, 0.0], abs=1.0e-9)   # forward
+
+
+def test_imu_frame_matches_params(robot: ET.Element, params: dict) -> None:
+    # /imu/data_raw는 imu_link로 나온다. 이 frame이 없으면 EKF가 tf 조회에서 막힌다.
+    joint = _joint(robot, "imu_joint")
+    assert joint.attrib["type"] == "fixed"
+    assert joint.find("parent").attrib["link"] == "base_link"
+    assert joint.find("child").attrib["link"] == "imu_link"
+    origin = joint.find("origin")
+    assert _floats(origin.attrib["xyz"]) == pytest.approx(params["imu_xyz_m"], abs=1.0e-9)
+    assert _floats(origin.attrib["rpy"]) == pytest.approx(
+        [math.radians(value) for value in params["imu_rpy_deg"]], abs=1.0e-9
+    )
 
 
 def test_wheel_joints_are_rotatable(robot: ET.Element, params: dict) -> None:

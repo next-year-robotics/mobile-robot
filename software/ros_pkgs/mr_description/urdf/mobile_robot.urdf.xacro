@@ -25,6 +25,13 @@
   <xacro:arg name="cart_mesh_z" default="-0.043482687"/>
   <xacro:arg name="mesh_scale" default="0.001"/>
   <xacro:arg name="mesh_prefix" default="package://mr_description"/>
+  <!-- PROVISIONAL IMU mount (config/robot_params.yaml imu_*). Update after installation. -->
+  <xacro:arg name="imu_x" default="0.000"/>
+  <xacro:arg name="imu_y" default="0.000"/>
+  <xacro:arg name="imu_z" default="0.050"/>
+  <xacro:arg name="imu_roll" default="0.0"/>
+  <xacro:arg name="imu_pitch" default="0.0"/>
+  <xacro:arg name="imu_yaw" default="0.0"/>
   <!-- 8.6 + 0.5 + 0.5 + 0.2 = measured complete-robot mass 9.8 kg. -->
   <xacro:arg name="chassis_mass" default="8.6"/>
   <xacro:arg name="wheel_mass" default="0.5"/>
@@ -56,6 +63,12 @@
   <xacro:property name="chassis_mass_v" value="$(arg chassis_mass)"/>
   <xacro:property name="wheel_mass_v" value="$(arg wheel_mass)"/>
   <xacro:property name="camera_mass_v" value="$(arg camera_mass)"/>
+  <xacro:property name="imu_x_v" value="$(arg imu_x)"/>
+  <xacro:property name="imu_y_v" value="$(arg imu_y)"/>
+  <xacro:property name="imu_z_v" value="$(arg imu_z)"/>
+  <xacro:property name="imu_roll_v" value="$(arg imu_roll)"/>
+  <xacro:property name="imu_pitch_v" value="$(arg imu_pitch)"/>
+  <xacro:property name="imu_yaw_v" value="$(arg imu_yaw)"/>
 
   <material name="aluminium">
     <color rgba="0.62 0.68 0.78 1.0"/>
@@ -182,5 +195,16 @@
     <child link="camera_optical_frame"/>
     <!-- optical +Z=forward, +X=right, +Y=down from robot +X/+Y/+Z -->
     <origin xyz="0 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+  </joint>
+
+  <!-- ICM-42688-P sensor axes. /imu/data_raw is published in this frame, so the
+       mount rotation lives here, not in firmware (REP-145). Frame only: the
+       module's mass is inside the chassis budget. -->
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="${imu_x_v} ${imu_y_v} ${imu_z_v}"
+            rpy="${imu_roll_v} ${imu_pitch_v} ${imu_yaw_v}"/>
   </joint>
 </robot>

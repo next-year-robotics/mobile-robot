@@ -19,3 +19,11 @@ mr_base:
     # 시작값이며, IMU와 EKF를 붙일 때 다시 맞춘다.
     pose_covariance_diagonal:  [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 0.01]
     twist_covariance_diagonal: [0.001, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 0.01]
+
+# /imu/data_raw → /imu/data. MCU가 0(모름)으로 보낸 공분산을 여기서 채운다.
+# 값은 ICM-42688-P 데이터시트 노이즈 밀도 × √NBW(25.9 Hz)로 낸 진동 없는 하한이다
+# (유도는 mr_base/imu_node.py 주석). EKF를 붙일 때 정지·주행 실측으로 다시 맞춘다.
+mr_imu:
+  ros__parameters:
+    angular_velocity_variance: [6.19e-8, 6.19e-8, 6.19e-8]        # (rad/s)^2
+    linear_acceleration_variance: [1.05e-5, 1.05e-5, 1.22e-5]     # (m/s^2)^2

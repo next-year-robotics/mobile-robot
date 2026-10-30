@@ -15,11 +15,12 @@ setup(
     zip_safe=True,
     maintainer='emjdp',
     maintainer_email='seongho06@khu.ac.kr',
-    description='휠 오도메트리와 odom -> base_footprint TF.',
+    description='휠 오도메트리, odom -> base_footprint TF, IMU 공분산 중계.',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
             'odom_node = mr_base.odom_node:main',
+            'imu_node = mr_base.imu_node:main',
         ],
     },
 )
