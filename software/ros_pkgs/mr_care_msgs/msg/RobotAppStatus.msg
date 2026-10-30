@@ -19,6 +19,7 @@ uint8 TRACKING_SEARCHING=1
 uint8 TRACKING_FOLLOWING=2
 uint8 TRACKING_LOST=3
 uint8 TRACKING_ERROR=4
+uint8 TRACKING_IDLE=5        # 주행 중이 아니라 추적하지 않음(추적 입력은 있음). 2026-09-27 추가
 uint8 TRACKING_UNKNOWN=255
 uint8 tracking_state
 
