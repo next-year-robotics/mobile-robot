@@ -2,7 +2,7 @@
 import math
 
 from mr_aruco.tracking import (
-    marker_normal_yaw, MarkerTracker, PlanarPose,
+    continuous_planar_normal_yaw, marker_normal_yaw, MarkerTracker, PlanarPose,
     scale_point_from_origin,
     STATUS_HOLDING, STATUS_LOST, STATUS_TRACKING, TrackConfig, wrap_angle,
 )
@@ -75,6 +75,25 @@ def test_wrap_angle():
     assert wrap_angle(-2 * math.pi - 0.5) == pytest.approx(-0.5)
     # ±pi는 같은 각이라 부호는 부동소수 잔차가 정한다. 크기만 본다.
     assert abs(wrap_angle(3 * math.pi)) == pytest.approx(math.pi)
+
+
+def test_planar_normal_continuity_keeps_near_observed_branch():
+    out = continuous_planar_normal_yaw(
+        observed_yaw=2.90, ray_bearing=-0.10, reference_yaw=2.88)
+    assert out == pytest.approx(2.90)
+
+
+def test_planar_normal_continuity_recovers_reflected_pnp_branch():
+    # 실측과 같은 형태: 검출 해는 -3.04 rad로 뛰지만 시선축 반사 후보는
+    # 직전 정상 법선 2.89 rad 부근에 남는다.
+    out = continuous_planar_normal_yaw(
+        observed_yaw=-3.04, ray_bearing=-0.16, reference_yaw=2.89)
+    assert out == pytest.approx(wrap_angle(2.0 * -0.16 - (-3.04)))
+    assert abs(wrap_angle(out - 2.89)) < 0.20
+
+
+def test_planar_normal_continuity_first_sample_uses_detector_choice():
+    assert continuous_planar_normal_yaw(-3.04, -0.16, None) == pytest.approx(-3.04)
 
 
 # ------------------------------------------------------------------ 락

@@ -211,6 +211,25 @@ def wrap_angle(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
+def continuous_planar_normal_yaw(
+        observed_yaw: float, ray_bearing: float,
+        reference_yaw: Optional[float]) -> float:
+    """평면 PnP의 두 법선 후보 중 시간적으로 연속인 쪽을 고른다.
+
+    정사각 평면의 두 PnP 해는 카메라에서 마커로 향하는 시선축을 기준으로 법선이
+    서로 반사된 관계다. 수평 투영에서 반대 후보는 ``2*bearing - yaw``다.
+    검출기가 어느 한 해만 주더라도 이 관계로 다른 후보를 복원하고, 직전 정상
+    법선과 각거리로 가까운 쪽을 택한다. 첫 표본은 검출기의 선택을 그대로 쓴다.
+    """
+    observed = wrap_angle(observed_yaw)
+    if reference_yaw is None:
+        return observed
+    reflected = wrap_angle(2.0 * ray_bearing - observed)
+    observed_error = abs(wrap_angle(observed - reference_yaw))
+    reflected_error = abs(wrap_angle(reflected - reference_yaw))
+    return reflected if reflected_error < observed_error else observed
+
+
 def marker_normal_yaw(qx: float, qy: float, qz: float, qw: float) -> tuple:
     """마커 자세 쿼터니언에서 바깥 법선의 지면 투영 방향을 뽑는다.
 
