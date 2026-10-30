@@ -136,6 +136,117 @@ def test_no_follow_service_is_error(ros):
     assert st.last_error == '추종을 시작하지 못했어요'
 
 
+def test_sos_lost_recover_and_no_ack_safety_stop(monkeypatch):
+    """M3(2026-09-27 결정): 주행 중 LOST 지속 → SosRequest, 회복 지속 → SosClear, 해제 즉시 재무장,
+    SosAck(app_received=false) → follow disable + trip error, 마커가 다시 보여도 자동 재개 없음.
+    mr_aruco_msgs가 없어도 돌게 마커 입력은 probe 타이머가 노드 콜백을 직접 부른다. 경합이 없게 단일 스레드 executor."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv('ROS_AUTOMATIC_DISCOVERY_RANGE', 'LOCALHOST')
+    import rclpy
+    from mr_care_msgs.msg import SosAck, SosClear, SosRequest
+    from rclpy.executors import SingleThreadedExecutor
+
+    from mr_mission.node import RELIABLE
+
+    ctx = rclpy.Context()
+    rclpy.init(context=ctx, domain_id=TEST_DOMAIN_ID)
+    ex = SingleThreadedExecutor(context=ctx)
+    world = FakeWorld(ctx)
+    env = Env(ctx, sos_lost_s=1.0, sos_recover_s=0.5)
+    reqs, clears = [], []
+    env.probe.create_subscription(SosRequest, '/safety/sos_request', reqs.append, RELIABLE)
+    env.probe.create_subscription(SosClear, '/safety/sos_clear', clears.append, RELIABLE)
+    ack_pub = env.probe.create_publisher(SosAck, '/safety/sos_ack', RELIABLE)
+    marker = {'status': None}
+
+    def feed():
+        if marker['status'] is not None:
+            env.mission.on_marker(SimpleNamespace(status=marker['status']))
+    env.probe.create_timer(0.1, feed)
+    for n in (world.node, env.mission, env.probe):
+        ex.add_node(n)
+    th = threading.Thread(target=ex.spin, daemon=True)
+    th.start()
+
+    def wait(pred, what, timeout=6.0):
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            if pred():
+                return
+            time.sleep(0.02)
+        raise AssertionError(f'{what}; reqs={len(reqs)} clears={[(c.sos_id, c.resolution) for c in clears]} '
+                             f'states={[x.mission_state for x in env.statuses[-4:]]}')
+    try:
+        env.wait_state(env.RobotAppStatus.MISSION_IDLE)
+        env.send(env.TripCommand.COMMAND_START, 'trip-s')
+        env.wait_state(env.RobotAppStatus.MISSION_ACTIVE)
+        marker['status'] = 1                                  # 잡았다
+        time.sleep(0.5)
+        marker['status'] = 0                                  # 놓쳤다
+        wait(lambda: reqs, 'no SosRequest after LOST')
+        r1 = reqs[0]
+        assert (r1.reason, r1.severity, r1.trip_id) == (SosRequest.REASON_TRACKING_LOST,
+                                                        SosRequest.SEVERITY_CRITICAL, 'trip-s')
+        assert len(r1.sos_id) == 36 and world.enabled          # SOS만으로는 trip을 멈추지 않는다(D5)
+        ack_pub.publish(SosAck(sos_id=r1.sos_id, app_received=True, retries=0))
+        marker['status'] = 1
+        wait(lambda: clears, 'no SosClear after recovery')
+        assert (clears[0].sos_id, clears[0].resolution) == (r1.sos_id, SosClear.RESOLUTION_TRACKING_RECOVERED)
+        marker['status'] = 0                                  # 다시 놓침 → 재무장돼 있다(D2)
+        wait(lambda: len(reqs) == 2, 'no second SosRequest')
+        r2 = reqs[1]
+        assert r2.sos_id != r1.sos_id and world.enabled
+        ack_pub.publish(SosAck(sos_id=r2.sos_id, app_received=False, retries=3))   # 폰 무응답(OPEN-R3)
+        st = env.wait_state(env.RobotAppStatus.MISSION_ERROR, timeout=6)
+        assert st.last_error == '어르신 폰이 응답하지 않아 멈췄어요' and not world.enabled
+        marker['status'] = 1                                  # 다시 보여도
+        wait(lambda: len(clears) == 2, 'no SosClear after second recovery')
+        time.sleep(0.5)
+        assert not world.enabled and env.statuses[-1].mission_state == env.RobotAppStatus.MISSION_ERROR
+        assert world.calls.count(True) == 1                   # 자동 재개 없음
+    finally:
+        ex.shutdown()
+        for n in (world.node, env.mission, env.probe):
+            n.destroy_node()
+        rclpy.try_shutdown(context=ctx)
+        th.join(5)
+
+
+def test_link_loss_stops_trip_without_resume(ros):
+    """D6(2026-09-27 결정): 주행 중 앱 링크가 유예(여기서는 1 s) 안에 돌아오면 계속, 넘기면 follow off + trip error,
+    다시 붙어도 자동 재개 없음."""
+    from mr_care_msgs.msg import PhoneLinkStatus
+
+    from mr_mission.node import LATCHED
+    ctx, add = ros
+    world = FakeWorld(ctx)
+    env = Env(ctx, link_lost_stop_s=1.0)
+    link_pub = env.probe.create_publisher(PhoneLinkStatus, '/phone/link_status', LATCHED)
+    add(world.node, env.mission, env.probe)
+
+    def link(up):
+        link_pub.publish(PhoneLinkStatus(connected=up, app_instance_id='app', session_id='s'))
+    link(True)
+    env.wait_state(env.RobotAppStatus.MISSION_IDLE)
+    env.send(env.TripCommand.COMMAND_START, 'trip-l')
+    env.wait_state(env.RobotAppStatus.MISSION_ACTIVE)
+    link(False)
+    time.sleep(0.5)
+    link(True)                                            # 유예 안에 재연결 → 계속
+    time.sleep(1.2)
+    assert world.enabled and env.statuses[-1].mission_state == env.RobotAppStatus.MISSION_ACTIVE
+    link(False)
+    st = env.wait_state(env.RobotAppStatus.MISSION_ERROR, timeout=5)
+    assert st.last_error == '폰 연결이 끊겨 멈췄어요' and st.trip_id == 'trip-l' and not world.enabled
+    link(True)
+    time.sleep(1.0)
+    assert env.statuses[-1].mission_state == env.RobotAppStatus.MISSION_ERROR
+    assert not world.enabled and world.calls.count(True) == 1      # 자동 재개 없음
+    env.send(env.TripCommand.COMMAND_CANCEL, 'trip-l')              # 앱 멈춤으로 정리
+    env.wait_state(env.RobotAppStatus.MISSION_CANCELLED)
+
+
 BRIDGE_MISSING = [m for m in ('mr_phone_bridge', 'websockets') if importlib.util.find_spec(m) is None]
 
 
