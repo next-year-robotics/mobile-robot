@@ -274,3 +274,27 @@ def test_cli_starts_and_serves(tmp_path):
         proc.stdout.close()
         proc.stderr.close()
     assert proc.returncode == 0
+
+
+def test_app_sos_raise_and_cancel(tmp_path):
+    """앱 SOS 버튼(sos.raise) → manual sos.request → ack·위치 → '괜찮아요'(sos.cancel) → sos.clear(cancelled)."""
+    async def body():
+        async with scenario_bridge(tmp_path, 'default6') as h:
+            c = await h.client()
+            await c.hello()
+            rid = await c.send('sos.raise', {'reason': 'manual'})
+            assert (await c.reply(rid))['type'] == 'ack'
+            req = await c.expect('sos.request')
+            sid = req['payload']['sos_id']
+            assert req['payload']['reason'] == 'manual'
+            await c.send('sos.ack', {'sos_id': sid, 'received': True}, reply_to=req['id'])
+            again = await c.send('sos.raise', {'reason': 'manual'})       # 열린 SOS가 있으면 ack만
+            assert (await c.reply(again))['type'] == 'ack'
+            cid = await c.send('sos.cancel', {'sos_id': sid})
+            assert (await c.reply(cid))['type'] == 'ack'
+            clear = await c.expect('sos.clear')
+            assert clear['payload'] == {'sos_id': sid, 'resolution': 'cancelled'}
+            late = await c.send('sos.cancel', {'sos_id': sid})
+            assert (await c.reply(late))['payload']['code'] == 'INVALID_STATE'
+            await c.close()
+    run(body())

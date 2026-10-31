@@ -93,6 +93,15 @@ class MockBackend(Backend):
             self._later(self.terminal_hold_s, self._to_idle)
         self._later(self.cancel_delay_s, done)
 
+    def raise_sos(self, *, request_id, sos_id, trip_id) -> None:
+        """mission 대역: 곧바로 manual SOS를 연다(앱이 sos.request를 받고 위치를 회신하는 흐름까지 시험할 수 있게)."""
+        self._record('/phone/sos_raise', {'sos_id': sos_id, 'trip_id': trip_id})
+        asyncio.ensure_future(self.core.request_sos(sos_id, 'manual', 'critical', trip_id))
+
+    def cancel_sos(self, *, request_id, sos_id) -> None:
+        self._record('/phone/sos_cancel', {'sos_id': sos_id})
+        asyncio.ensure_future(self.core.clear_sos(sos_id, 'cancelled'))
+
     def publish_location(self, *, message_id, payload, low_confidence) -> None:
         self._record('/phone/location', {'message_id': message_id, 'reason': payload['reason'],
                                          'sos_id': payload['sos_id'], 'source': payload['source'],

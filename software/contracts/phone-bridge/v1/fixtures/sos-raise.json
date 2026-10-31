@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "type": "sos.raise",
+  "id": "0b9a4c1e-7d2f-4e55-9a31-6c8e2f4d7b90",
+  "sent_at_ms": 1787792430000,
+  "reply_to": null,
+  "payload": {
+    "reason": "manual"
+  }
+}

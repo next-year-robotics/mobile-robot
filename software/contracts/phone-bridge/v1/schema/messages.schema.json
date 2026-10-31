@@ -16,6 +16,8 @@
     { "$ref": "#/$defs/place.delete" },
     { "$ref": "#/$defs/location.update" },
     { "$ref": "#/$defs/sos.ack" },
+    { "$ref": "#/$defs/sos.raise" },
+    { "$ref": "#/$defs/sos.cancel" },
     { "$ref": "#/$defs/place.catalog" },
     { "$ref": "#/$defs/robot.status" },
     { "$ref": "#/$defs/sos.request" },
@@ -321,6 +323,38 @@
           "properties": {
             "sos_id": { "$ref": "#/$defs/uuid" },
             "received": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
+    "sos.raise": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "description": "어르신이 앱의 SOS 버튼을 눌렀다(2026-11-01 추가). ack 뒤 mission이 SOS를 열면 서버가 sos.request(reason=manual)를 보낸다. 이미 열린 SOS가 있으면 새로 열지 않는다.",
+      "properties": {
+        "type": { "const": "sos.raise" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["reason"],
+          "properties": {
+            "reason": { "type": "string", "enum": ["manual"] }
+          }
+        }
+      }
+    },
+
+    "sos.cancel": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "description": "어르신이 SOS 화면에서 '괜찮아요'를 눌렀다(2026-11-01 추가). ack 뒤 mission이 SOS를 닫으면 서버가 sos.clear(resolution=cancelled)를 보낸다.",
+      "properties": {
+        "type": { "const": "sos.cancel" },
+        "reply_to": { "type": "null" },
+        "payload": {
+          "type": "object",
+          "required": ["sos_id"],
+          "properties": {
+            "sos_id": { "$ref": "#/$defs/uuid" }
           }
         }
       }

@@ -25,7 +25,7 @@ MAX_FRAME_BYTES = 16 * 1024
 # 앱이 보내는 type. `error`는 양방향이다.
 CLIENT_TYPES = frozenset({
     'hello', 'heartbeat', 'trip.start', 'trip.cancel', 'place.upsert', 'place.delete',
-    'location.update', 'sos.ack', 'error',
+    'location.update', 'sos.ack', 'sos.raise', 'sos.cancel', 'error',
 })
 # 서버가 보내는 type.
 SERVER_TYPES = frozenset({

@@ -135,3 +135,11 @@ class RosBackend(Backend):
             ros_id = self._sos_ids.get(sos_id, sos_id)
         self.outbox.put(('sos_ack', {'sos_id': ros_id, 'app_received': app_received, 'retries': retries,
                                      'has_location': has_location, 'best_source': best_source}))
+
+    def raise_sos(self, *, request_id, sos_id, trip_id) -> None:
+        self.outbox.put(('sos_raise', {'sos_id': sos_id, 'trip_id': trip_id or ''}))
+
+    def cancel_sos(self, *, request_id, sos_id) -> None:
+        with self._lock:
+            ros_id = self._sos_ids.get(sos_id, sos_id)
+        self.outbox.put(('sos_cancel', {'sos_id': ros_id}))

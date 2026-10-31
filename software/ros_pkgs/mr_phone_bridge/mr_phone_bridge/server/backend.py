@@ -60,3 +60,9 @@ class Backend:
     def publish_sos_ack(self, *, sos_id: str, app_received: bool, retries: int, has_location: bool,
                         best_source: str) -> None:
         pass
+
+    def raise_sos(self, *, request_id: str, sos_id: str, trip_id: str | None) -> None:
+        """앱의 SOS 버튼(sos.raise). SOS를 열지는 mission이 정하고, 열면 request_sos로 돌아온다."""
+
+    def cancel_sos(self, *, request_id: str, sos_id: str) -> None:
+        """앱의 '괜찮아요'(sos.cancel). 닫으면 mission이 clear_sos로 돌려준다."""

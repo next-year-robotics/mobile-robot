@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "type": "sos.cancel",
+  "id": "5e3d2a7c-91b4-4f08-8c6a-2d1f0e9b4a77",
+  "sent_at_ms": 1787792440000,
+  "reply_to": null,
+  "payload": {
+    "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c"
+  }
+}

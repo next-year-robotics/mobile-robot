@@ -16,7 +16,7 @@ FIXTURES = sorted(p.stem for p in (contracts_path() / 'fixtures').glob('*.json')
 
 
 def test_fixture_count():
-    assert len(FIXTURES) == 26
+    assert len(FIXTURES) == 28
 
 
 @pytest.mark.parametrize('name', FIXTURES)
