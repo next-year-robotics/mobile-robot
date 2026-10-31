@@ -28,13 +28,15 @@ base_link -> camera optical:      [0.250,  0.000, 0.360] m
 base_link -> left wheel centre:   [0.000, +0.132, 0.000] m
 base_link -> right wheel centre:  [0.000, -0.132, 0.000] m
 camera mount RPY:                 [0.0, 0.0, 0.0] deg
-base_link -> imu_link:            [0.000,  0.000, 0.050] m  (provisional)
-imu mount RPY:                    [0.0, 0.0, 0.0] deg      (provisional)
+base_link -> imu_link:            [0.010, -0.160, 0.090] m
+imu mount RPY:                    [0.0, 0.0, 0.0] deg      (yaw unchecked)
 ```
 
-`imu_link` is a placeholder until the base interface board is mounted in its
-final place. Only "sensor +Z points up" has been measured (+1003 mg at rest on
-2026-10-30). Replace both lines with measured values after installation.
+The `imu_link` position was measured on the mounted robot on 2026-10-31:
+160 mm right of the drive-axle midpoint, 240 mm behind the aluminium-frame
+front face, and 140 mm above the floor. Sensor +Z points up (+9.83 m/s² at
+rest; the 2° tilt seen then is not applied). The yaw alignment of sensor X/Y
+to robot X/Y has not been checked yet, so the RPY line is not final.
 
 The camera optical centre is therefore 410 mm above the floor and 250 mm in
 front of the drive axle. It is centred laterally and looks straight forward.
@@ -45,6 +47,9 @@ front of the drive axle. It is centred laterally and looks straight forward.
 camera z from base_link = 0.410 - 0.050 = 0.360 m
 half wheel separation   = 0.264 / 2       = 0.132 m
 wheel side inset        = 0.400 / 2 - 0.132 = 0.068 m
+frame front x           = 0.025 + 0.450 / 2 = 0.250 m
+imu x from base_link    = 0.250 - 0.240   = 0.010 m
+imu z from base_link    = 0.140 - 0.050   = 0.090 m
 ```
 
 The measured “70 mm from each side” description is treated as rounded. The
