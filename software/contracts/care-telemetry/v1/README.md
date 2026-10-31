@@ -146,6 +146,12 @@
 "users":  { "<uid>": { "email": "…", "display_name": "…", "last_login_ms": 1790000000000 } }
 ```
 
+`users/{uid}/push/{key}`(2026-11-01 추가): 대시보드가 "알림 받기"에서 그 기기의 FCM 웹 푸시 토큰을 쓴다.
+`{ "token", "platform": "android|ios|desktop", "standalone": bool, "updated_at_ms" }`, `key`는 토큰 SHA-256 앞 24자(hex).
+에이전트(`mr_care_telemetry/push.py`)가 `access/{robot_id}`의 uid마다 이 토큰으로 **외출 시작(`trip.start`)과 SOS(`sos.request`)만**
+data 전용 메시지(`title`·`body`·`url`·`tag`·`urgent`)로 보내고, 대시보드 서비스 워커가 알림을 그린다. FCM이 404 `UNREGISTERED`로 답한 토큰은 지운다.
+`/users/{uid}` 규칙(본인만 읽기·쓰기)을 그대로 쓰므로 규칙 변경은 없다.
+
 `access`는 사람이 콘솔이나 `firebase database:set`으로 넣는다. 웹은 `/access/{robot_id}/{자기 uid}`를 읽어 역할을 알고, `dev`일 때만 진단 탭을 보인다.
 
 ## 4. 보안 규칙

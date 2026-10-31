@@ -13,3 +13,7 @@ mr_care_telemetry:
     publish_diag: false               # P2. true면 /joint_states도 구독해 /diag를 쓴다
     max_events: 1000
     marker_track_topic: "/marker_track"
+    # 보호자 웹 푸시(FCM, push.py, 2026-11-01): 외출 시작과 SOS만. 대시보드가 /users/{uid}/push에 토큰을 쓴다
+    push_enabled: true
+    push_link: "https://senior-care-dashboard.vercel.app/"   # 알림을 누르면 여는 주소(끝 / 필수)
+    senior_name: "어르신"             # "어르신께서 시장으로 외출을 시작하셨어요"

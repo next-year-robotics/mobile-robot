@@ -21,6 +21,7 @@ from typing import Callable
 
 from . import __version__
 from . import model as M
+from . import push as P
 from .outbox import Outbox
 from .rtdb import RtdbClient, RtdbError
 
@@ -51,6 +52,7 @@ class AgentConfig:
     backoff_max_s: float = 60.0
     error_log_repeat_s: float = 300.0
     loop_s: float = 0.2
+    senior_name: str = '어르신'          # 보호자 푸시 문구("어르신께서 시장으로 외출을 시작하셨어요")
 
 
 def now_ms() -> int:
@@ -60,10 +62,12 @@ def now_ms() -> int:
 class TelemetryAgent:
 
     def __init__(self, cfg: AgentConfig, client: RtdbClient, outbox: Outbox, *,
-                 clock: Callable[[], float] = time.monotonic, wall_ms: Callable[[], int] = now_ms):
+                 clock: Callable[[], float] = time.monotonic, wall_ms: Callable[[], int] = now_ms,
+                 push=None):
         self.cfg = cfg
         self.client = client
         self.outbox = outbox
+        self.push = push                     # push.PushNotifier 또는 None(에뮬레이터·시험)
         self.clock = clock
         self.wall_ms = wall_ms
         self.root = f'robots/{M.safe_key(cfg.robot_id)}'
@@ -105,6 +109,8 @@ class TelemetryAgent:
         self._emit('agent.online', 'info', M.MSG_AGENT_ONLINE, data={'version': self.cfg.version})
         self._thread = threading.Thread(target=self._run, name='care-telemetry-sender', daemon=True)
         self._thread.start()
+        if self.push is not None:
+            self.push.start()
         log.info('telemetry → %s robot=%s (queue %d)', self.client.target, self.cfg.robot_id, len(self.outbox))
 
     def stop(self, flush_timeout_s: float = 3.0) -> None:
@@ -113,6 +119,8 @@ class TelemetryAgent:
         self._flush_deadline = self.clock() + flush_timeout_s
         self._stop.set()
         self._wake.set()
+        if self.push is not None:
+            self.push.stop()
         if self._thread is not None:
             self._thread.join(flush_timeout_s + 5.0)
         self.outbox.close()
@@ -153,6 +161,9 @@ class TelemetryAgent:
             self._emit('trip.start', 'info',
                        M.trip_start_message(self.labels.get(frm, frm or '출발지'), self.labels.get(to, to or '목적지')),
                        trip_id=tid, data={'from_place_id': frm, 'to_place_id': to})
+            if self.push is not None:
+                title, body = P.trip_start_text(self.cfg.senior_name, self.labels.get(to, '목적지'))
+                self.push.notify('trip.start', title, body, tag=f'trip-{tid}', data={'trip_id': tid})
         elif ms == 'cancelled' and not t['ended']:
             t['ended'] = True
             self._emit('trip.cancelled', 'info', M.MSG_TRIP_CANCELLED, trip_id=tid,
@@ -227,6 +238,10 @@ class TelemetryAgent:
                                   'loc_updates': 0}
             self._emit('sos.request', severity, M.SOS_REQUEST_MESSAGES[reason], ts_ms=ts, trip_id=e['trip_id'],
                        sos_id=wire, data={'reason': reason})
+            if self.push is not None:
+                title, body = P.sos_text(self.cfg.senior_name, reason)
+                self.push.notify('sos.request', title, body, tag=f'sos-{wire}', urgent=True,
+                                 data={'sos_id': wire, 'reason': reason})
             if self.cfg.publish_sos_location:
                 self.outbox.put('PUT', self._sos_path(wire), {
                     'started_at_ms': ts, 'updated_at_ms': ts, 'reason': reason, 'severity': severity,

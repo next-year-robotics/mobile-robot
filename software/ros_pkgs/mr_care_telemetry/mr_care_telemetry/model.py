@@ -23,7 +23,7 @@ SOS_REQUEST_MESSAGES = {
     'tracking_lost': '로봇이 어르신을 놓쳤어요',
     'stuck': '로봇이 움직이지 못하고 있어요',
     'low_battery': '로봇 배터리가 부족해요',
-    'manual': 'SOS 요청이 들어왔어요',
+    'manual': '어르신이 도움을 요청했어요',
     'unknown': 'SOS가 발생했어요',
 }
 SOS_CLEAR_MESSAGES = {

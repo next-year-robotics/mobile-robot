@@ -42,13 +42,14 @@ def _b64url(data: bytes) -> str:
 class ServiceAccountToken:
     """서비스 계정 → OAuth2 access token. 만료 60 s 전에 새로 받는다."""
 
-    def __init__(self, path: str, *, timeout_s: float = 10.0):
+    def __init__(self, path: str, *, timeout_s: float = 10.0, scopes: str = SCOPES):
         self.path = os.path.expanduser(path)
         self._timeout_s = timeout_s
+        self.scopes = scopes
         self._lock = threading.Lock()
         self._token: str | None = None
         self._expires_at = 0.0
-        self.client_email = self.token_uri = None
+        self.client_email = self.token_uri = self.project_id = None
         self._key_pem = b''
 
     def _load(self) -> None:
@@ -60,6 +61,7 @@ class ServiceAccountToken:
             with open(self.path, encoding='utf-8') as f:
                 info = json.load(f)
             self.client_email = info['client_email']
+            self.project_id = info.get('project_id')
             self.token_uri = info.get('token_uri', 'https://oauth2.googleapis.com/token')
             self._key_pem = info['private_key'].encode('utf-8')
         except FileNotFoundError:
@@ -73,7 +75,7 @@ class ServiceAccountToken:
         self._load()
         now = int(now if now is not None else time.time())
         header = {'alg': 'RS256', 'typ': 'JWT'}
-        claims = {'iss': self.client_email, 'scope': SCOPES, 'aud': self.token_uri, 'iat': now, 'exp': now + 3600}
+        claims = {'iss': self.client_email, 'scope': self.scopes, 'aud': self.token_uri, 'iat': now, 'exp': now + 3600}
         signing_input = (_b64url(json.dumps(header, separators=(',', ':')).encode()) + '.'
                          + _b64url(json.dumps(claims, separators=(',', ':')).encode()))
         try:
