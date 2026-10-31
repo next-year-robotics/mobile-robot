@@ -18,6 +18,7 @@
 /* USART2 수신 인터럽트가 한 바이트씩 채우는 자리. */
 static uint8_t s_rx_byte;
 static uint32_t s_boot_reset_flags;
+static uint32_t s_boot_hse_wait_ms;
 
 void platform_boot_snapshot_reset_flags(void)
 {
@@ -38,6 +39,31 @@ uint32_t platform_boot_reset_flags(void)
 bool platform_boot_was_iwdg_reset(void)
 {
   return (s_boot_reset_flags & RCC_CSR_IWDGRSTF) != 0U;
+}
+
+void platform_boot_wait_hse(void)
+{
+  const uint32_t start_ms = HAL_GetTick();
+
+  /* __HAL_RCC_HSE_CONFIG(RCC_HSE_BYPASS)와 같은 순서다. 뒤이은 SystemClock_Config가
+     같은 bit를 다시 켜도 그대로이고, HSERDY가 이미 서 있으니 100 ms 대기를 곧바로 지난다. */
+  SET_BIT(RCC->CR, RCC_CR_HSEBYP);
+  SET_BIT(RCC->CR, RCC_CR_HSEON);
+  while (READ_BIT(RCC->CR, RCC_CR_HSERDY) == 0U)
+  {
+    if ((HAL_GetTick() - start_ms) >= BOOT_HSE_WAIT_MAX_MS)
+    {
+      /* Error_Handler에서 멈추면 사람이 리셋할 때까지 로봇이 죽어 있다. 모터 출력은
+         아직 초기화 전이라 기판 풀다운(R7~R10)으로 꺼져 있으니 다시 시작해도 안전하다. */
+      NVIC_SystemReset();
+    }
+  }
+  s_boot_hse_wait_ms = HAL_GetTick() - start_ms;
+}
+
+uint32_t platform_boot_hse_wait_ms(void)
+{
+  return s_boot_hse_wait_ms;
 }
 
 bool platform_iwdg_refresh(void)

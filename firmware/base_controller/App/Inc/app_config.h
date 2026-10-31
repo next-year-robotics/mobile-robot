@@ -38,6 +38,12 @@
 
 #define HEALTH_PERIOD_MS           50U
 
+/* boot 때 HSE를 기다리는 한계. NUCLEO-64의 HSE는 수정이 아니라 ST-LINK MCU의 MCO
+   8 MHz(bypass)인데, ST-Link USB 없이 전원을 넣으면 HAL 기본 HSE_STARTUP_TIMEOUT
+   (100 ms)보다 늦게 나와 SystemClock_Config가 Error_Handler에 멈췄다(2026-10-31).
+   이 시간 안에도 안 오면 소프트웨어 리셋으로 처음부터 다시 기다린다. */
+#define BOOT_HSE_WAIT_MAX_MS      3000U
+
 /* HIL 전용 build option. 평소에는 0이다. CMake의 -DIWDG_STALL_TEST=ON일 때만
    ControlTask 정지 주입 hook을 컴파일한다. */
 #ifndef IWDG_STALL_TEST
