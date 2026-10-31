@@ -162,6 +162,33 @@ def build_twist_mux() -> list:
     )]
 
 
+def build_teleop() -> list:
+    """Xbox 패드 → /cmd_vel_teleop. twist_mux 입력 중 우선순위가 가장 높다.
+
+    패드가 꺼져 있어도 joy_linux는 떠서 1초마다 다시 열어 본다. 그래서 자율
+    launch에 같이 띄워 두면 사람이 LB를 쥐는 순간 넘겨받는다.
+    """
+    params = [share('mr_bringup', 'config', 'teleop_joy.yaml')]
+    return [
+        Node(
+            package='joy_linux',
+            executable='joy_linux_node',
+            name='joy',
+            output='screen',
+            parameters=params,
+        ),
+        # 리맵을 빠뜨리면 /cmd_vel에 직접 발행해 twist_mux를 우회한다.
+        Node(
+            package='teleop_twist_joy',
+            executable='teleop_node',
+            name='teleop_joy',
+            output='screen',
+            parameters=params,
+            remappings=[('cmd_vel', 'cmd_vel_teleop')],
+        ),
+    ]
+
+
 def build_base(serial_device: str = '/dev/ttyAMA0', baud: str = '921600') -> list:
     """micro-ROS 에이전트 + 오도메트리 노드.
 
