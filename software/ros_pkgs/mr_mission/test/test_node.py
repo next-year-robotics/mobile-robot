@@ -291,6 +291,17 @@ def test_app_to_mission_end_to_end(ros, tmp_path):
             assert (await c.reply(tc))['type'] == 'ack'
             await c.expect('robot.status', timeout=5, where=lambda m: m['payload']['mission_state'] == 'cancelled')
             assert not world.enabled
+            # 앱 SOS 버튼(D7): sos.raise → mission이 연 manual SOS → sos.cancel → sos.clear(cancelled)
+            sr = await c.send('sos.raise', {'reason': 'manual'})
+            assert (await c.reply(sr))['type'] == 'ack'
+            req = await c.expect('sos.request', timeout=5)
+            assert req['payload']['reason'] == 'manual'
+            sid = req['payload']['sos_id']
+            await c.send('sos.ack', {'sos_id': sid, 'received': True}, reply_to=req['id'])
+            sc = await c.send('sos.cancel', {'sos_id': sid})
+            assert (await c.reply(sc))['type'] == 'ack'
+            clear = await c.expect('sos.clear', timeout=5)
+            assert clear['payload'] == {'sos_id': sid, 'resolution': 'cancelled'}
             await c.close()
         asyncio.run(asyncio.wait_for(body(), 30))
     finally:

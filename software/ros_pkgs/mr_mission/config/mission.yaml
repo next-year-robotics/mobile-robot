@@ -23,3 +23,7 @@ mr_mission:
     # ("폰 연결이 끊겨 멈췄어요", 자동 재개 없음). 브리지가 알아챈 때부터 센다(응답 없이 사라진 앱은 heartbeat 10 s가 앞에 붙는다). 0.0이면 끔
     link_lost_stop_s: 30.0
     link_stale_s: 12.0                # connected=true가 이만큼 재발행 안 되면(브리지는 5 s마다) 끊김으로 본다(브리지 프로세스 죽음)
+    # 배터리 잔량(battery.py, 2026-11-01). /base/status는 다이오드 뒤라 단자보다 이만큼 낮다. 표는 battery.py SOC_TABLE
+    base_status_topic: "/base/status"
+    battery_diode_drop_v: 0.30
+    battery_filter_tau_s: 20.0
