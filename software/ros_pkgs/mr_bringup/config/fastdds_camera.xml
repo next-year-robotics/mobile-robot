@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dds>
+  <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    <transport_descriptors>
+      <transport_descriptor>
+        <transport_id>camera_udp</transport_id>
+        <type>UDPv4</type>
+      </transport_descriptor>
+      <transport_descriptor>
+        <transport_id>camera_shm</transport_id>
+        <type>SHM</type>
+        <!-- 1280x720 RGB8 is about 2.64 MiB per frame. The default 512 KiB
+             segment loses large messages; allow several frames in flight. -->
+        <segment_size>16777216</segment_size>
+      </transport_descriptor>
+    </transport_descriptors>
+    <participant profile_name="mr_camera_transport" is_default_profile="true">
+      <rtps>
+        <userTransports>
+          <transport_id>camera_udp</transport_id>
+          <transport_id>camera_shm</transport_id>
+        </userTransports>
+        <!-- Replace the small builtin SHM transport; retain UDP discovery
+             and communication with participants on other computers. -->
+        <useBuiltinTransports>false</useBuiltinTransports>
+      </rtps>
+    </participant>
+  </profiles>
+</dds>
