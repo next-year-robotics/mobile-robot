@@ -19,6 +19,9 @@ sources:
     - nominal drive-wheel separation is 0.264 m
     - nominal drive-wheel radius is 0.050 m
     - nominal drive-wheel width is 0.024 m
+    - IMU is 0.160 m right of the drive-axle midpoint (2026-10-31)
+    - IMU is 0.240 m behind the aluminium-frame front face (2026-10-31)
+    - IMU is 0.140 m above the floor (2026-10-31)
   annotated_image_role: placement intent only; written dimensions are authoritative
 
 robot_coordinate_system:
@@ -73,6 +76,20 @@ camera:
     note: >-
       A mount-face-to-lens offset is unnecessary because the optical centre was
       supplied directly. The C920 and its mount are not present in the current CAD.
+
+imu:
+  reference_point: ICM-42688-P on the base interface board (J11)
+  measured_on: "2026-10-31"
+  frame_front_x_from_base_link_m: 0.250
+  xyz_from_base_footprint_m: [0.010, -0.160, 0.140]
+  xyz_from_base_link_m: [0.010, -0.160, 0.090]
+  sensor_z_axis_robot: [0.0, 0.0, 1.0]
+  rest_acceleration_sensor_m_s2: [-0.325, -0.090, 9.830]
+  rpy_deg: [0.0, 0.0, 0.0]
+  note: >-
+    Sensor +Z = up is measured. The roughly 2 deg rest tilt can be floor slope
+    or accelerometer bias, so it is not applied. The yaw alignment of sensor
+    X/Y to robot X/Y has not been checked; rpy_deg is not final until it is.
 
 drive_wheels:
   axle_midpoint_from_base_link_m: [0.000, 0.000, 0.000]

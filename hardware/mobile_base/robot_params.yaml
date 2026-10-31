@@ -22,10 +22,11 @@ wheel_separation_m:   0.264
 wheel_radius_m:       0.050
 wheel_width_m:        0.024
 
-# --- IMU frame (imu_link), PROVISIONAL until the interface board is mounted ---
-# Placeholder at the drive-axle midpoint, 50 mm up. Only sensor +Z = up is
-# measured; X/Y yaw alignment is unchecked. Replace after installation.
-imu_xyz_m:            [0.000, 0.000, 0.050]
+# --- IMU frame (imu_link), measured on the mounted robot 2026-10-31 ---
+# 160 mm right of the drive-axle midpoint, 240 mm behind the frame front face,
+# 140 mm above the floor. Sensor +Z = up is measured; X/Y yaw alignment is
+# still unchecked, so imu_rpy_deg stays zero.
+imu_xyz_m:            [0.010, -0.160, 0.090]
 imu_rpy_deg:          [0.0, 0.0, 0.0]
 
 # --- Measured total mass and URDF link-mass budget ---

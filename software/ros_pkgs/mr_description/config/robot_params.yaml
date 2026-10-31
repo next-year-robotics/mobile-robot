@@ -14,12 +14,13 @@ wheel_radius_m: 0.050
 wheel_width_m: 0.024
 
 # IMU (ICM-42688-P on the base interface board, J11) -> imu_link.
-# PROVISIONAL (2026-10-30): the board is not in its final place yet. The origin
-# is a placeholder at the drive-axle midpoint (the turning centre), 50 mm up.
-# Replace both lines with measured values after installation.
-# Measured so far: sensor +Z points up (+1003 mg at rest). The yaw alignment of
-# sensor X/Y to robot X/Y is NOT checked; yaw rate about Z is unaffected by it.
-imu_xyz_m: [0.000, 0.000, 0.050]
+# Position measured on the mounted robot (2026-10-31): 160 mm right of the
+# drive-axle midpoint, 240 mm behind the aluminium-frame front face (x = +0.250),
+# and 140 mm above the floor (base_link is 50 mm up).
+# Orientation: sensor +Z points up (+9.83 m/s^2 at rest, tilt under 2 deg, not
+# applied). The yaw alignment of sensor X/Y to robot X/Y is NOT checked yet;
+# yaw rate about Z is unaffected by it.
+imu_xyz_m: [0.010, -0.160, 0.090]
 imu_rpy_deg: [0.0, 0.0, 0.0]
 
 # The independent CAD preserves the measured cart STEP origin.  Apply this
