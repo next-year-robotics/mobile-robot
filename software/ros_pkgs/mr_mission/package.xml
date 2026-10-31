@@ -11,6 +11,7 @@
   <depend>std_srvs</depend>
   <depend>nav_msgs</depend>
   <depend>mr_care_msgs</depend>
+  <depend>mr_msgs</depend>
 
   <test_depend>python3-pytest</test_depend>
   <test_depend>mr_phone_bridge</test_depend>  <!-- 앱→브리지→mission 통합 시험(없으면 skip) -->

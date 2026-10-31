@@ -11,6 +11,8 @@ D1~D5(SOS, `SafetyMonitor`)와 D6(앱 연결 끊김, `LinkWatch`) 모두 2026-09
     D3b SOS 중 앱 명령: 멈춤 → sos_clear(cancelled), 새 출발 → sos_clear(handled).
     D4 SosAck(app_received=false)이고 stop_on_no_ack이면 ('stop', ...) 한 번. 주행 중일 때만.
     D5 trip 상태는 바꾸지 않는다. 정지는 호출자(mission)가 follow disable 경로로 한다.
+    D7 앱 SOS 버튼(sos.raise, 2026-11-01): 열린 SOS가 없으면 manual SOS를 연다(주행과 무관). manual은 마커 회복으로
+       닫지 않는다. 앱 '괜찮아요'(sos.cancel)는 어떤 SOS든 cancelled로 닫는다. D3b(앱 출발·멈춤)도 그대로 닫는다.
 
 입력 메서드는 모두 now(단조 시계, s)를 받고 actions 목록을 돌려준다:
     ('sos_request', sos_id, reason, severity, trip_id)
@@ -50,6 +52,7 @@ class SafetyMonitor:
         self._seen_at: float | None = None     # 마지막으로 TRACKING/HOLDING을 받은 시각
         self._recover_since: float | None = None
         self.sos_id: str | None = None       # 활성 SOS
+        self.sos_reason: str | None = None
         self._stop_sent = False
         self.log: list[str] = []
 
@@ -84,6 +87,24 @@ class SafetyMonitor:
         self._acquired = False
         return self._clear('cancelled' if command == 'cancel' else 'handled')
 
+    def manual(self, now: float, sos_id: str) -> list:
+        """D7. 앱의 SOS 버튼. sos_id는 브리지가 만든 UUID를 그대로 쓴다."""
+        if self.sos_id is not None:
+            self.log.append(f'manual SOS ignored: SOS {self.sos_id} already active')
+            return []
+        self.sos_id, self.sos_reason = sos_id, 'manual'
+        self._stop_sent = False
+        self.log.append(f'SOS {sos_id}: raised from the app (trip {self.trip_id})')
+        return [('sos_request', sos_id, 'manual', self.cfg.severity, self.trip_id)]
+
+    def cancel(self, now: float, sos_id: str) -> list:
+        """D7. 앱의 '괜찮아요'."""
+        if sos_id != self.sos_id:
+            return []
+        if self.sos_reason != 'manual':
+            self._acquired = False           # D3b와 같다: 이번 놓침은 끝난 것으로 본다
+        return self._clear('cancelled')
+
     def sos_ack(self, now: float, sos_id: str, app_received: bool) -> list:
         if sos_id != self.sos_id or app_received or self._stop_sent:
             return []
@@ -98,6 +119,8 @@ class SafetyMonitor:
         if self._recover_since is not None and self._marker_at is not None and now - self._marker_at > c.marker_stale_s:
             self._recover_since = None                      # 회복 중 marker_track이 끊겼다
         if self.sos_id is not None:
+            if self.sos_reason == 'manual':
+                return []
             if self._recover_since is not None and now - self._recover_since >= c.recover_to_clear_s:
                 return self._clear('tracking_recovered')
             return []
@@ -118,14 +141,14 @@ class SafetyMonitor:
     # ------------------------------------------------------------ 내부
 
     def _request(self, now: float) -> list:
-        self.sos_id = self._new_id()
+        self.sos_id, self.sos_reason = self._new_id(), 'tracking_lost'
         self._stop_sent = False
         self._recover_since = None
         self.log.append(f'SOS {self.sos_id}: marker lost for {now - self._seen_at:.1f} s (trip {self.trip_id})')
         return [('sos_request', self.sos_id, 'tracking_lost', self.cfg.severity, self.trip_id)]
 
     def _clear(self, resolution: str) -> list:
-        sid, self.sos_id = self.sos_id, None
+        sid, self.sos_id, self.sos_reason = self.sos_id, None, None
         self._stop_sent = False
         self.log.append(f'SOS {sid} cleared: {resolution}')
         return [('sos_clear', sid, resolution)]

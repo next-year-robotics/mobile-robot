@@ -2,6 +2,8 @@
 SOS 판단(M3): /marker_track LOST 지속 → /safety/sos_request, 회복 → /safety/sos_clear,
 /safety/sos_ack(app_received=false) → 안전 정지(follow disable, trip error).
 앱 연결 끊김(D6): 주행 중 /phone/link_status가 연속 끊김(기본 30 s) → 안전 정지(follow disable, trip error).
+앱 SOS 버튼(D7): /phone/sos_raise → manual SOS, /phone/sos_cancel → sos_clear(cancelled).
+배터리: /base/status supply_voltage → battery_percent(battery.py).
 
     ros2 launch mr_mission mission.launch.py
 
@@ -20,14 +22,19 @@ from nav_msgs.msg import Odometry
 from rclpy.executors import ExternalShutdownException
 from rclpy.signals import SignalHandlerOptions
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from std_srvs.srv import SetBool
 
 try:  # ArUco 브랜치가 설치돼 있을 때만
     from mr_aruco_msgs.msg import MarkerTrack
 except ImportError:  # pragma: no cover
     MarkerTrack = None
+try:  # 베이스 메시지(mr_base). 없으면 battery_percent는 -1
+    from mr_msgs.msg import BaseStatus
+except ImportError:  # pragma: no cover
+    BaseStatus = None
 
+from .battery import BatteryEstimator
 from .machine import Mission, MissionConfig
 from .safety import LinkConfig, LinkWatch, SafetyConfig, SafetyMonitor
 
@@ -52,6 +59,7 @@ RESOLUTION_CODES = {
     'cancelled': SosClear.RESOLUTION_CANCELLED, 'unknown': SosClear.RESOLUTION_UNKNOWN,
 }
 SEVERITY_CODES = {'critical': SosRequest.SEVERITY_CRITICAL, 'warning': SosRequest.SEVERITY_WARNING}
+REASON_CODES = {'tracking_lost': SosRequest.REASON_TRACKING_LOST, 'manual': SosRequest.REASON_MANUAL}
 DISABLE_CALL_TIMEOUT_S = 1.0
 
 
@@ -77,6 +85,8 @@ class MissionNode(Node):
             self.sos_req_pub = self.create_publisher(SosRequest, '/safety/sos_request', RELIABLE)
             self.sos_clear_pub = self.create_publisher(SosClear, '/safety/sos_clear', RELIABLE)
             self.create_subscription(SosAck, '/safety/sos_ack', self.on_sos_ack, RELIABLE)
+            self.create_subscription(SosRequest, '/phone/sos_raise', self.on_sos_raise, RELIABLE)
+            self.create_subscription(SosClear, '/phone/sos_cancel', self.on_sos_cancel, RELIABLE)
 
         self.link = None
         if p['link_lost_stop_s'] > 0:
@@ -91,6 +101,10 @@ class MissionNode(Node):
             self.create_subscription(MarkerTrack, p['marker_track_topic'], self.on_marker, 10)
         else:
             self.get_logger().info('mr_aruco_msgs not available: tracking_state stays "unavailable"')
+        self.battery = BatteryEstimator(diode_drop_v=p['battery_diode_drop_v'], tau_s=p['battery_filter_tau_s'])
+        if BaseStatus is not None and p['base_status_topic']:
+            # micro-ROS가 BEST_EFFORT로 낸다. RELIABLE로 받으면 QoS 불일치로 하나도 안 온다(2026-11-01 실기)
+            self.create_subscription(BaseStatus, p['base_status_topic'], self.on_base_status, qos_profile_sensor_data)
         self.client = self.create_client(SetBool, p['follow_enable_service'])
         self.calls: deque[dict] = deque()
         self._last_status: tuple | None = None
@@ -112,6 +126,7 @@ class MissionNode(Node):
             'odom_topic': '/odom', 'marker_track_topic': '/marker_track',
             'sos_enabled': True, 'sos_lost_s': 10.0, 'sos_recover_s': 5.0, 'sos_stop_on_no_ack': True,
             'link_lost_stop_s': 30.0, 'link_stale_s': 12.0,
+            'base_status_topic': '/base/status', 'battery_diode_drop_v': 0.30, 'battery_filter_tau_s': 20.0,
         }
         out = {}
         for name, default in defaults.items():
@@ -150,6 +165,17 @@ class MissionNode(Node):
     def on_sos_ack(self, msg: SosAck):
         now = time.monotonic()
         self._safety(now, self.safety.sos_ack(now, msg.sos_id, msg.app_received))
+
+    def on_sos_raise(self, msg: SosRequest):
+        now = time.monotonic()
+        self._safety(now, self.safety.manual(now, msg.sos_id))
+
+    def on_sos_cancel(self, msg: SosClear):
+        now = time.monotonic()
+        self._safety(now, self.safety.cancel(now, msg.sos_id))
+
+    def on_base_status(self, msg):
+        self.battery.update(time.monotonic(), float(msg.supply_voltage))
 
     def on_link(self, msg: PhoneLinkStatus):
         now = time.monotonic()
@@ -190,7 +216,7 @@ class MissionNode(Node):
                 _, sos_id, reason, severity, trip_id = a
                 m = SosRequest()
                 m.header.stamp = self.get_clock().now().to_msg()
-                m.sos_id, m.reason = sos_id, SosRequest.REASON_TRACKING_LOST
+                m.sos_id, m.reason = sos_id, REASON_CODES.get(reason, SosRequest.REASON_UNKNOWN)
                 m.severity = SEVERITY_CODES.get(severity, SosRequest.SEVERITY_CRITICAL)
                 m.trip_id = trip_id or ''
                 self.sos_req_pub.publish(m)
@@ -270,7 +296,8 @@ class MissionNode(Node):
             self.get_logger().info(line)
         self.mission.log.clear()
         st = self.mission.status(now)
-        key = tuple(sorted(st.items()))
+        battery = self.battery.percent(now)
+        key = tuple(sorted(st.items())) + (battery,)
         if key == self._last_status and now - self._last_pub_at < self.status_period_s:
             return
         self._last_status, self._last_pub_at = key, now
@@ -282,7 +309,7 @@ class MissionNode(Node):
         m.trip_id = st['trip_id'] or ''
         m.from_place_id = st['from_place_id'] or ''
         m.to_place_id = st['to_place_id'] or ''
-        m.battery_percent = -1           # 배터리 인터페이스 없음
+        m.battery_percent = battery
         m.last_error = st['last_error'] or ''
         self.pub.publish(m)
 

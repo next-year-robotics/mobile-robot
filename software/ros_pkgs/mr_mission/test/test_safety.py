@@ -332,3 +332,35 @@ def test_link_down_for():
     k.set(False)
     k.run(7.0)
     assert k.w.down_for(k.t) == pytest.approx(7.0, abs=0.11)
+
+
+# ============================================================ D7: 앱 SOS 버튼
+
+MANUAL = '0b9a4c1e-7d2f-4e55-9a31-6c8e2f4d7b90'
+
+
+def test_manual_sos_opens_outside_trip_and_is_not_cleared_by_marker():
+    r = Run()
+    assert r.do('manual', MANUAL) == [('sos_request', MANUAL, 'manual', 'critical', None)]
+    assert r.run(10.0) == []                               # 마커를 계속 봐도 tracking_recovered로 닫지 않는다
+    assert r.do('manual', 'another') == []                 # 열린 SOS가 있으면 새로 열지 않는다
+    assert r.do('cancel', 'other-id') == []
+    assert r.do('cancel', MANUAL) == [('sos_clear', MANUAL, 'cancelled')]
+    assert r.s.sos_id is None and r.s.sos_reason is None
+
+
+def test_manual_sos_during_trip_keeps_trip_and_app_trip_command_clears():
+    r = Run()
+    r.active()
+    assert kinds(r.do('manual', MANUAL)) == ['sos_request']
+    assert r.out[-1][4] == TRIP
+    assert r.do('trip_command', 'cancel') == [('sos_clear', MANUAL, 'cancelled')]
+
+
+def test_cancel_closes_tracking_lost_sos_and_does_not_reopen_at_once():
+    r = Run()
+    r.active()
+    r.run(1.0)
+    r.run(10.1, MARKER_LOST)
+    assert r.do('cancel', 'sos-1') == [('sos_clear', 'sos-1', 'cancelled')]
+    assert r.run(20.0, MARKER_LOST) == []
