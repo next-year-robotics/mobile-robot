@@ -997,6 +997,7 @@ void rtos_app_init(void)
   g_rtos_metrics.boot_reset_flags = platform_boot_reset_flags();
   g_rtos_metrics.boot_was_iwdg_reset =
       platform_boot_was_iwdg_reset() ? 1U : 0U;
+  g_rtos_metrics.boot_hse_wait_ms = platform_boot_hse_wait_ms();
   g_rtos_metrics.iwdg_test_mode = (uint32_t)IWDG_STALL_TEST;
 
   /* 엔코더는 이미 platform_init()에서 돌고 있다. 현재 카운터를 기준으로 잡아

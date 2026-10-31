@@ -65,6 +65,7 @@ typedef struct
   /* IWDG/reset 계측. reset_flags는 boot 직후 RCC_CSR의 reset-cause bit mask다. */
   uint32_t boot_reset_flags;
   uint32_t boot_was_iwdg_reset;
+  uint32_t boot_hse_wait_ms;          /* SystemClock_Config 전에 HSE(ST-LINK MCO)를 기다린 시간 */
   uint32_t iwdg_first_refresh_ms;     /* boot HAL tick 기준 startup handoff 시각 */
   uint32_t iwdg_refresh_count;
   uint32_t iwdg_refresh_fail_count;

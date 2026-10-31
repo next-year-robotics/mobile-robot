@@ -92,6 +92,9 @@ int main(void)
      멈춰 SWD 계측이 reset을 유발하지 않게 한다. 둘 다 IWDG 시작보다 앞선다. */
   platform_boot_snapshot_reset_flags();
   __HAL_DBGMCU_FREEZE_IWDG();
+  /* HSE는 ST-LINK MCO다. ST-Link USB 없이 전원을 넣으면 HAL의 100 ms보다 늦게
+     나오므로 SystemClock_Config 전에 여기서 먼저 기다린다. */
+  platform_boot_wait_hse();
 
   /* USER CODE END Init */
 

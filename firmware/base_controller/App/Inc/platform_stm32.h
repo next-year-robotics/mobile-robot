@@ -28,6 +28,16 @@ uint32_t platform_boot_reset_flags(void);
 bool platform_boot_was_iwdg_reset(void);
 
 /**
+  * @brief  HSE bypass를 켜고 클럭이 들어올 때까지 BOOT_HSE_WAIT_MAX_MS까지 기다린다.
+  * @note   HAL_Init() 직후, SystemClock_Config()/IWDG 시작 전에 한 번 호출한다.
+  *         한계를 넘기면 돌아오지 않고 NVIC_SystemReset()으로 다시 시작한다.
+  */
+void platform_boot_wait_hse(void);
+
+/** @brief boot 때 HSE를 기다린 시간 [ms]. */
+uint32_t platform_boot_hse_wait_ms(void);
+
+/**
   * @brief IWDG counter를 refresh한다. HealthTask만 호출한다.
   * @retval HAL refresh 성공 여부.
   */
