@@ -12,7 +12,7 @@ from launch.substitutions import LaunchConfiguration
 
 from mr_bringup.launch_common import (
     build_aruco_tracker, build_base, build_camera, build_description,
-    build_follow, build_marker_track, build_twist_mux,
+    build_follow, build_marker_track, build_teleop, build_twist_mux,
 )
 
 
@@ -29,6 +29,8 @@ def _setup(context, *args, **kwargs):
         marker_id=int(LaunchConfiguration('marker_id').perform(context)))
     nodes += build_twist_mux()
     nodes += build_follow(enabled_on_start=False)
+    if LaunchConfiguration('teleop').perform(context) == 'true':
+        nodes += build_teleop()
     return nodes
 
 
@@ -41,5 +43,8 @@ def generate_launch_description() -> LaunchDescription:
             'base', default_value='true',
             description='micro-ROS 에이전트와 오도메트리를 같이 띄울지. '
                         '노트북에서 인지만 볼 때는 false.'),
+        DeclareLaunchArgument(
+            'teleop', default_value='true',
+            description='Xbox 패드 수동 개입. LB를 쥐면 자율 입력을 누른다.'),
         OpaqueFunction(function=_setup),
     ])

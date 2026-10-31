@@ -12,7 +12,7 @@ from launch.substitutions import LaunchConfiguration
 
 from mr_bringup.launch_common import (
     build_align, build_aruco_tracker, build_base, build_camera,
-    build_description, build_marker_track, build_twist_mux,
+    build_description, build_marker_track, build_teleop, build_twist_mux,
 )
 
 
@@ -29,6 +29,8 @@ def _setup(context, *args, **kwargs):
         marker_id=int(LaunchConfiguration('marker_id').perform(context)))
     nodes += build_twist_mux()
     nodes += build_align()
+    if LaunchConfiguration('teleop').perform(context) == 'true':
+        nodes += build_teleop()
     return nodes
 
 
@@ -39,5 +41,8 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('video_device', default_value=''),
         DeclareLaunchArgument('serial_device', default_value='/dev/ttyAMA0'),
         DeclareLaunchArgument('base', default_value='true'),
+        DeclareLaunchArgument(
+            'teleop', default_value='true',
+            description='Xbox 패드 수동 개입. LB를 쥐면 자율 입력을 누른다.'),
         OpaqueFunction(function=_setup),
     ])

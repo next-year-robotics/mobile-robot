@@ -1,0 +1,52 @@
+# Xbox 패드 수동 조종 — joy_linux → teleop_twist_joy → /cmd_vel_teleop.
+#
+#   LB 누른 채 왼쪽 스틱    보통 (최대 0.25 m/s, 1.0 rad/s)
+#   RB 누른 채 왼쪽 스틱    빠르게 (최대 0.5 m/s, 2.0 rad/s)
+#   LB만 쥐고 스틱 중립     0을 계속 낸다 — 우선순위 100이라 추종·정렬이 멈춘다
+#   손을 떼면               0을 한 번 내고 끊는다. twist_mux가 0.3 s 뒤 자율 입력으로 넘긴다
+#
+# 속도는 스틱 기울기에 비례한다. 단계식 가감속 버튼은 teleop_twist_joy에 없다.
+# 가속 제한도 없다 — 스틱을 튕기면 계단 지령이 그대로 MCU로 간다(limits.md 3절).
+#
+# joy 패키지의 game_controller_node(SDL)를 쓰지 않는 이유: autorepeat 발행이
+# SDL_WaitEventTimeout이 시간 초과될 때만 일어나서, 엄지가 스틱에 닿아 BLE
+# 보고가 계속 들어오는 동안(데드존 안이거나 끝까지 민 상태라 값이 안 바뀜)
+# 발행이 멎는다. 조작 중 270 ms 공백을 봤다 — 워치독 200 ms를 넘는다.
+# joy_linux는 select() 남은 시간으로 타이머를 이어 가서 이벤트가 리셋하지 않는다.
+# 대신 종료할 때마다 SIGABRT로 죽는다 — 루프를 빠져나온 뒤 끝난 컨텍스트로
+# spin_some을 부른다(upstream 그대로). 동작에는 영향 없고, apport는 첫 보고만
+# 쓰고 그 뒤로는 건너뛴다.
+joy:
+  ros__parameters:
+    dev: /dev/input/js0
+    # 기본값 /dev/input/event0을 진동용으로 열고 계속 써 넣는다. 그 노드는
+    # 패드가 아니다(Pi 전원 버튼 등).
+    dev_ff: ""
+    deadzone: 0.1
+    # 입력이 그대로여도 다시 낸다. 0이면 스틱을 한 자리에 쥐고 있는 동안
+    # 메시지가 끊겨 twist_mux 0.3 s 만료 → 워치독 정지가 반복된다.
+    autorepeat_rate: 30.0
+    # 스틱이 움직이는 동안 발행 상한(50 Hz). 기본 1 ms면 BLE 보고마다 낸다.
+    coalesce_interval: 0.02
+
+# 번호는 커널 joydev 순서다(hid-microsoft, 블루투스 연결, 2026-10-31 ioctl로 확인).
+# USB로 꽂으면 xpad 드라이버라 버튼 번호가 달라진다(LB 4, RB 5).
+teleop_joy:
+  ros__parameters:
+    # 베이스가 TwistStamped만 받는다. stamp는 MCU 워치독이 명령 나이를 재는 근거다.
+    publish_stamped_twist: true
+    frame: base_footprint
+    enable_button: 6            # LB
+    enable_turbo_button: 7      # RB — LB 없이 이것만 눌러도 빠르게 움직인다
+    axis_linear:
+      x: 1                      # 왼쪽 스틱 상하, 위 = +
+    scale_linear:
+      x: 0.25
+    scale_linear_turbo:
+      x: 0.5
+    axis_angular:
+      yaw: 0                    # 왼쪽 스틱 좌우, 왼쪽 = + (반시계)
+    scale_angular:
+      yaw: 1.0
+    scale_angular_turbo:
+      yaw: 2.0
