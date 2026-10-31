@@ -23,6 +23,19 @@ def share(package: str, *parts: str) -> str:
     return os.path.join(get_package_share_directory(package), *parts)
 
 
+def _camera_transport_env() -> dict[str, str]:
+    """720p RGB 프레임을 담을 수 있는 SHM 프로필을 적용한다.
+
+    전역 셸 설정 대신 큰 영상을 송신하는 카메라 프로세스에만 적용한다.
+    두 이름은 Fast DDS 버전별 프로필 환경 변수다.
+    """
+    profile = share('mr_bringup', 'config', 'fastdds_camera.xml')
+    return {
+        'FASTDDS_DEFAULT_PROFILES_FILE': profile,
+        'FASTRTPS_DEFAULT_PROFILES_FILE': profile,
+    }
+
+
 def build_description(use_sim_time: bool = False) -> list:
     """robot_state_publisher — base_link와 카메라 프레임을 세운다.
 
@@ -65,6 +78,7 @@ def build_camera(video_device: str = '') -> list:
         namespace='camera',
         output='screen',
         parameters=params,
+        additional_env=_camera_transport_env(),
     )
     disable_autofocus = ExecuteProcess(
         cmd=[
