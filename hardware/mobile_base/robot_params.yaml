@@ -24,10 +24,10 @@ wheel_width_m:        0.024
 
 # --- IMU frame (imu_link), measured on the mounted robot 2026-10-31 ---
 # 160 mm right of the drive-axle midpoint, 240 mm behind the frame front face,
-# 140 mm above the floor. Sensor +Z = up is measured; X/Y yaw alignment is
-# still unchecked, so imu_rpy_deg stays zero.
+# 140 mm above the floor. Sensor X points backward (yaw 177.5 deg, measured by
+# driving); roll/pitch are the fixed gravity tilt and include accelerometer offset.
 imu_xyz_m:            [0.010, -0.160, 0.090]
-imu_rpy_deg:          [0.0, 0.0, 0.0]
+imu_rpy_deg:          [-1.0, 2.1, 177.5]
 
 # --- Measured total mass and URDF link-mass budget ---
 # The three link classes below sum to the measured 9.8 kg total.  The chassis

@@ -17,11 +17,14 @@ wheel_width_m: 0.024
 # Position measured on the mounted robot (2026-10-31): 160 mm right of the
 # drive-axle midpoint, 240 mm behind the aluminium-frame front face (x = +0.250),
 # and 140 mm above the floor (base_link is 50 mm up).
-# Orientation: sensor +Z points up (+9.83 m/s^2 at rest, tilt under 2 deg, not
-# applied). The yaw alignment of sensor X/Y to robot X/Y is NOT checked yet;
-# yaw rate about Z is unaffected by it.
+# Orientation measured by driving (2026-10-31): sensor X points backward, so
+# yaw is about 180 deg, 2.5 deg short of it (forward/back accelerations, four
+# runs within 1 deg). Roll/pitch come from the gravity component that stays
+# fixed in the sensor through a full in-place turn (floor slope 0.17 deg removed).
+# They also hold the accelerometer zero-g offset, which cannot be separated
+# without flipping the board; with them, gravity lies on base_link +Z on a flat floor.
 imu_xyz_m: [0.010, -0.160, 0.090]
-imu_rpy_deg: [0.0, 0.0, 0.0]
+imu_rpy_deg: [-1.0, 2.1, 177.5]
 
 # The independent CAD preserves the measured cart STEP origin.  Apply this
 # translation in base_link before the millimetre STL is scaled to metres.

@@ -83,13 +83,21 @@ imu:
   frame_front_x_from_base_link_m: 0.250
   xyz_from_base_footprint_m: [0.010, -0.160, 0.140]
   xyz_from_base_link_m: [0.010, -0.160, 0.090]
-  sensor_z_axis_robot: [0.0, 0.0, 1.0]
-  rest_acceleration_sensor_m_s2: [-0.325, -0.090, 9.830]
-  rpy_deg: [0.0, 0.0, 0.0]
+  rpy_deg: [-1.0, 2.1, 177.5]
+  orientation_measurement:
+    method: >-
+      Rest gravity at five headings over one full in-place turn (0, 90, 182,
+      271, 361 deg by gyro), then two forward/back runs of about 0.12 m.
+    floor_slope_deg: 0.17
+    fixed_gravity_component_sensor_mg: [-36.2, -17.8]
+    tilt_fit_residual_rms_mg: 1.2
+    yaw_from_forward_acceleration_deg: [177.4, 177.9]
+    centripetal_imu_offset_from_turning_centre_m: [0.042, -0.161]
   note: >-
-    Sensor +Z = up is measured. The roughly 2 deg rest tilt can be floor slope
-    or accelerometer bias, so it is not applied. The yaw alignment of sensor
-    X/Y to robot X/Y has not been checked; rpy_deg is not final until it is.
+    Sensor X points backward. Roll/pitch are the fixed gravity component and
+    include the accelerometer zero-g offset, which cannot be separated without
+    flipping the board. The centripetal y offset confirms the 0.160 m right
+    placement; its x value is within the noise of that method.
 
 drive_wheels:
   axle_midpoint_from_base_link_m: [0.000, 0.000, 0.000]
