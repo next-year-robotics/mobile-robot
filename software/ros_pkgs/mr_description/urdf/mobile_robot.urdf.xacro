@@ -25,13 +25,13 @@
   <xacro:arg name="cart_mesh_z" default="-0.043482687"/>
   <xacro:arg name="mesh_scale" default="0.001"/>
   <xacro:arg name="mesh_prefix" default="package://mr_description"/>
-  <!-- IMU mount measured 2026-10-31 (config/robot_params.yaml imu_*). Yaw alignment unchecked. -->
+  <!-- IMU mount measured 2026-10-31 (config/robot_params.yaml imu_*). RPY -1.0/2.1/177.5 deg in radians. -->
   <xacro:arg name="imu_x" default="0.010"/>
   <xacro:arg name="imu_y" default="-0.160"/>
   <xacro:arg name="imu_z" default="0.090"/>
-  <xacro:arg name="imu_roll" default="0.0"/>
-  <xacro:arg name="imu_pitch" default="0.0"/>
-  <xacro:arg name="imu_yaw" default="0.0"/>
+  <xacro:arg name="imu_roll" default="-0.017453293"/>
+  <xacro:arg name="imu_pitch" default="0.036651914"/>
+  <xacro:arg name="imu_yaw" default="3.097959422"/>
   <!-- 8.6 + 0.5 + 0.5 + 0.2 = measured complete-robot mass 9.8 kg. -->
   <xacro:arg name="chassis_mass" default="8.6"/>
   <xacro:arg name="wheel_mass" default="0.5"/>

@@ -29,14 +29,21 @@ base_link -> left wheel centre:   [0.000, +0.132, 0.000] m
 base_link -> right wheel centre:  [0.000, -0.132, 0.000] m
 camera mount RPY:                 [0.0, 0.0, 0.0] deg
 base_link -> imu_link:            [0.010, -0.160, 0.090] m
-imu mount RPY:                    [0.0, 0.0, 0.0] deg      (yaw unchecked)
+imu mount RPY:                    [-1.0, 2.1, 177.5] deg
 ```
 
 The `imu_link` position was measured on the mounted robot on 2026-10-31:
 160 mm right of the drive-axle midpoint, 240 mm behind the aluminium-frame
-front face, and 140 mm above the floor. Sensor +Z points up (+9.83 m/s² at
-rest; the 2° tilt seen then is not applied). The yaw alignment of sensor X/Y
-to robot X/Y has not been checked yet, so the RPY line is not final.
+front face, and 140 mm above the floor. The orientation was measured by
+driving the same day. Sensor +Z points up and sensor X points backward:
+forward/back accelerations put the yaw at 177.5° (four runs within 1°).
+Centripetal acceleration during in-place turns puts the sensor 0.161 m right of
+the turning centre, which agrees with the tape measurement.
+
+Roll and pitch are the part of gravity that stays fixed in the sensor through
+a full in-place turn; the floor slope (0.17°) is removed. They also contain the
+accelerometer zero-g offset, which cannot be separated without flipping the
+board. With these values, gravity lies on base_link +Z on a flat floor.
 
 The camera optical centre is therefore 410 mm above the floor and 250 mm in
 front of the drive axle. It is centred laterally and looks straight forward.
