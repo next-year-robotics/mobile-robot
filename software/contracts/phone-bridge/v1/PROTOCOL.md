@@ -14,7 +14,7 @@
 - 앱·대시보드 저장소는 이 디렉터리의 **복사본**을 `contracts/`에 둔다. 복사는 각 저장소의 `scripts/sync-contracts.sh`로 하고, CI가 정본과의 차이를 검사한다. 복사본을 직접 고치지 않는다.
 - v1에서 허용되는 변경은 **선택 필드 추가**와 enum 값 추가(수신 측은 모르는 enum을 `unknown`으로 처리)뿐이다. 필수 필드 삭제·의미 변경은 `/bridge/v2`다.
 - 변경 절차: 이 문서 수정 → 스키마·fixture 수정 → `tools/validate_fixtures.py` 통과 → 서버·앱 양쪽 테스트 통과 → 병합. 한쪽만 바꾼 상태로 병합하지 않는다.
-- fixture(현재 26개)는 문서 예시와 자동 테스트가 함께 읽는 단일 파일이다. 서버 테스트(`mr_phone_bridge/test/`)와 앱 테스트(`app/src/test/`)는 모두 이 파일을 파싱·검증한다.
+- fixture(현재 28개)는 문서 예시와 자동 테스트가 함께 읽는 단일 파일이다. 서버 테스트(`mr_phone_bridge/test/`)와 앱 테스트(`app/src/test/`)는 모두 이 파일을 파싱·검증한다.
 
 ### 1.1 관련 저장소
 
@@ -101,6 +101,8 @@ MVP의 `ws://`는 인터넷에 공개되지 않은 개인 핫스팟 안에서만
 | `place.delete` | 앱 → RPi5 | `ack` 또는 `error` | 프리셋 삭제 |
 | `location.update` | 앱 → RPi5 | `ack` 또는 `error` | periodic/SOS 위치 |
 | `sos.ack` | 앱 → RPi5 | `ack` 또는 `error` | SOS 수신 확인 |
+| `sos.raise` | 앱 → RPi5 | `ack` 또는 `error` | 어르신이 앱에서 SOS를 직접 요청(2026-11-01) |
+| `sos.cancel` | 앱 → RPi5 | `ack` 또는 `error` | 어르신이 SOS를 직접 닫음(2026-11-01) |
 | `place.catalog` | RPi5 → 앱 | 없음 | 프리셋 전체 동기화 |
 | `robot.status` | RPi5 → 앱 | 없음 | 앱용 로봇 상태 |
 | `sos.request` | RPi5 → 앱 | `sos.ack` | SOS 처리 요청 |
@@ -524,7 +526,7 @@ places:
 - 앱은 마지막 수신 후 5초가 지나면 상태를 `stale`로 표시한다.
 - 앱이 모르는 enum은 crash시키지 않고 `unknown`으로 표시한다.
 - `following`·`searching`·`lost`는 주행 중에만 나온다. 2026-09-27 전에는 주행 밖에서도 마커가 보이면 `following`을 보냈다(로봇은 서 있는데 "따라가는 중"으로 보였다).
-- 배터리 인터페이스가 없으므로 `battery_percent`는 `null`이다.
+- `battery_percent`: 2026-11-01부터 mission이 `/base/status` `supply_voltage`(다이오드 강하 보정)로 4S LiFePO4 휴지 전압표에서 추정해 5 % 단위로 낸다. 전압을 못 받았으면 `null`. 주행 중에는 처져서 낮게 나온다.
 
 ### 9.8 목적지 좌표의 역할
 
@@ -704,6 +706,33 @@ MVP에서는 RPi5 브리지가 앱의 SOS ACK와 위치를 ROS 2 토픽으로 �
 
 `[OPEN-P1]` 로봇 측에서 확인한 좌표를 실제 보호자에게 어떻게 전달할지는 별도 제품 요구사항이다. 자동 SMS/전화는 Android 권한과 배포 정책 검토가 필요하므로 Android MVP 인수 범위에 넣지 않는다.
 
+
+### 10.7 앱 → RPi5: `sos.raise`, `sos.cancel` (2026-11-01 추가)
+
+어르신이 앱의 SOS 버튼을 누르면 `sos.raise`를 보낸다. 서버는 `ack`(`{"status":"accepted"}`)만 돌려주고 SOS를 여는 판단은
+mission 계층이 한다. SOS가 열리면 서버가 평소처럼 `sos.request`(`reason=manual`)를 보내고, 앱은 10.5 순서대로 `sos.ack`와
+위치를 회신한다. 앱이 SOS를 따로 만들지 않으므로 보호자 대시보드·텔레메트리는 로봇이 연 SOS와 같은 경로로 받는다.
+
+```json
+{ "version": 1, "type": "sos.raise", "id": "0b9a4c1e-7d2f-4e55-9a31-6c8e2f4d7b90", "sent_at_ms": 1787792430000,
+  "reply_to": null, "payload": { "reason": "manual" } }
+```
+
+- 이미 열린 SOS가 있으면 새로 열지 않고 `ack`만 보낸다. 앱은 그 SOS의 `sos.request`를 이미 받았거나 재전송(10.5)으로 받는다.
+- mission 계층이 없으면(`mission_state=unknown`) `NOT_READY`.
+- `manual` SOS는 마커를 다시 잡아도 저절로 닫히지 않는다(`tracking_recovered` 없음). 닫는 길은 `sos.cancel`, 앱의 `trip.start`/`trip.cancel`(10.6), 로봇 종료다.
+- 주행 상태는 바꾸지 않는다. 주행 중이면 그대로 따라간다.
+
+`sos.cancel`은 SOS 화면의 `괜찮아요`다. 어떤 이유로 열린 SOS든 닫을 수 있다. 서버는 `ack` 뒤 mission이 닫으면 `sos.clear`(`resolution=cancelled`)를 보낸다.
+열린 SOS가 아니면 `INVALID_STATE`.
+
+```json
+{ "version": 1, "type": "sos.cancel", "id": "5e3d2a7c-91b4-4f08-8c6a-2d1f0e9b4a77", "sent_at_ms": 1787792440000,
+  "reply_to": null, "payload": { "sos_id": "835fcafe-60ac-4517-9f06-50bcd2486b6c" } }
+```
+
+v1 하위 호환: 이 두 type을 모르는 이전 서버는 `UNSUPPORTED_TYPE`으로 답한다. 앱은 이때 SOS 버튼을 "지금은 쓸 수 없어요"로 안내한다.
+
 ---
 
 
@@ -857,3 +886,4 @@ enum은 ROS에서 정수 상수, WebSocket에서 문자열이다. 변환표는 `
 | 2026-09-27 | 7.1 URL 행을 실제 연결 방식(`ws://<RPi5 IP>:8765/bridge/v1`)으로, 7.3에 앱의 평문 허용 범위 명시 | 없음(앱이 이미 그렇게 구현) |
 | 2026-09-27 | 10.5·10.6·8: OPEN-R3 정지 결정, 로봇 측 SOS 해제 사유 | 없음(표시는 기존 `error`·`sos.clear` 그대로) |
 | 2026-09-27 | 8.4: 주행 중 앱 연결이 30초 끊기면 로봇이 멈추고 trip `error`("폰 연결이 끊겨 멈췄어요"), 자동 재개 없음 | 없음(재연결 뒤 기존 `robot.status`의 `error`·`last_error` 표시 그대로). 문서 sync만 |
+| 2026-11-01 | 10.7 `sos.raise`·`sos.cancel` 추가(앱 → RPi5, 앱의 SOS 버튼과 `괜찮아요`). 9.7 `battery_percent`를 mission이 전압으로 채움 | 앱: SOS 버튼·`괜찮아요`, 배터리 표시. 이전 서버는 `UNSUPPORTED_TYPE` |

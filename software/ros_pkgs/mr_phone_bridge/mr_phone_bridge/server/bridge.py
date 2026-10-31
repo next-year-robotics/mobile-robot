@@ -161,6 +161,8 @@ class BridgeCore:
             'place.delete': self._place_delete,
             'location.update': self._location_update,
             'sos.ack': self._sos_ack,
+            'sos.raise': self._sos_raise,
+            'sos.cancel': self._sos_cancel,
         }
 
     # ============================================================ 수명
@@ -470,6 +472,27 @@ class BridgeCore:
         p = msg.payload
         if not self.sos.on_ack(p['sos_id'], p['received']):
             log.info('sos.ack for inactive SOS %s', p['sos_id'])
+        return [make('ack', {'status': 'accepted'}, msg.id)], None
+
+    async def _sos_raise(self, msg: Message):
+        # 이미 열린 SOS가 있으면 mission에 보내지 않는다. 앱은 그 SOS의 sos.request를 이미 받았거나 재전송으로 받는다.
+        if self.sos.active:
+            log.info('sos.raise %s: SOS already active', msg.id)
+            return [make('ack', {'status': 'accepted'}, msg.id)], None
+        mission, snap = self._effective_mission()
+        if mission == 'unknown':
+            raise ProtocolError(NOT_READY, 'mission controller is not available')
+        sos_id = new_id()
+        self.backend.raise_sos(request_id=msg.id, sos_id=sos_id, trip_id=snap.trip_id)
+        log.info('sos.raise %s: asked mission to open SOS %s', msg.id, sos_id)
+        return [make('ack', {'status': 'accepted'}, msg.id)], None
+
+    async def _sos_cancel(self, msg: Message):
+        sos_id = msg.payload['sos_id']
+        if sos_id not in self.sos.active:
+            raise ProtocolError(INVALID_STATE, 'sos_id is not active')
+        self.backend.cancel_sos(request_id=msg.id, sos_id=sos_id)
+        log.info('sos.cancel %s: asked mission to close SOS %s', msg.id, sos_id)
         return [make('ack', {'status': 'accepted'}, msg.id)], None
 
     def _require_place_edit(self) -> None:

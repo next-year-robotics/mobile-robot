@@ -127,6 +127,9 @@ class PhoneBridgeNode(Node):
         self.pub_link = self.create_publisher(PhoneLinkStatus, '/phone/link_status', LATCHED)
         self.pub_catalog = self.create_publisher(PlaceCatalog, '/robot/place_catalog', LATCHED)
         self.pub_sos_ack = self.create_publisher(SosAck, '/safety/sos_ack', RELIABLE)
+        # 앱의 SOS 버튼·'괜찮아요'(sos.raise/sos.cancel). mission이 받아 /safety/sos_request·sos_clear로 낸다
+        self.pub_sos_raise = self.create_publisher(SosRequest, '/phone/sos_raise', RELIABLE)
+        self.pub_sos_cancel = self.create_publisher(SosClear, '/phone/sos_cancel', RELIABLE)
 
         self.create_subscription(RobotAppStatus, '/robot/app_status', self.on_app_status, LATCHED)
         self.create_subscription(SosRequest, '/safety/sos_request', self.on_sos_request, RELIABLE)
@@ -255,6 +258,20 @@ class PhoneBridgeNode(Node):
             m.has_location = d['has_location']
             m.best_source = enums.to_int(enums.LOCATION_SOURCE, d['best_source'])
             self.pub_sos_ack.publish(m)
+        elif kind == 'sos_raise':
+            m = SosRequest()
+            m.header.stamp = stamp
+            m.sos_id = d['sos_id']
+            m.reason = SosRequest.REASON_MANUAL
+            m.severity = SosRequest.SEVERITY_CRITICAL
+            m.trip_id = d['trip_id']
+            self.pub_sos_raise.publish(m)
+        elif kind == 'sos_cancel':
+            m = SosClear()
+            m.header.stamp = stamp
+            m.sos_id = d['sos_id']
+            m.resolution = SosClear.RESOLUTION_CANCELLED
+            self.pub_sos_cancel.publish(m)
         else:
             raise ValueError(f'unknown outbox kind {kind}')
 
