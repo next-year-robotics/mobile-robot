@@ -33,7 +33,8 @@ except ImportError:  # pragma: no cover
 
 from .agent import AgentConfig, TelemetryAgent
 from .outbox import Outbox
-from .rtdb import RtdbClient
+from .push import FCM_SCOPE, FcmSender, PushNotifier
+from .rtdb import RtdbClient, ServiceAccountToken
 
 RELIABLE = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10, reliability=ReliabilityPolicy.RELIABLE,
                       durability=DurabilityPolicy.VOLATILE)
@@ -65,7 +66,7 @@ def stamp_ms(t) -> int:
 
 # 노드에서 로그를 남기는 모듈. 패키지 로거 하나에 달지 않고 모듈 로거마다 단다: launch가 import된 프로세스
 # (launch_testing pytest 플러그인)에서는 logging 계층이 깨져 자식 로거의 부모가 root가 된다.
-PY_LOGGERS = ('mr_care_telemetry.agent', 'mr_care_telemetry.outbox')
+PY_LOGGERS = ('mr_care_telemetry.agent', 'mr_care_telemetry.outbox', 'mr_care_telemetry.push')
 
 
 class RosLogHandler(logging.Handler):
@@ -105,11 +106,15 @@ class TelemetryNode(Node):
         cfg = AgentConfig(robot_id=p['robot_id'], display_name=p['display_name'],
                           status_period_s=p['status_period_s'], app_status_stale_s=p['app_status_stale_s'],
                           publish_sos_location=p['publish_sos_location'], publish_diag=p['publish_diag'],
-                          max_events=p['max_events'])
+                          max_events=p['max_events'], senior_name=p['senior_name'])
+        push = None
         if client is None:
             client = RtdbClient.from_settings(p['database_url'], p['service_account_path'],
                                               emulator_host=p['emulator_host'] or None)
-        self.agent = TelemetryAgent(cfg, client, outbox or Outbox(p['queue_db_path']))
+        if p['push_enabled'] and isinstance(client, RtdbClient) and not client.emulator_host:
+            sender = FcmSender(ServiceAccountToken(p['service_account_path'], scopes=FCM_SCOPE))
+            push = PushNotifier(client, sender, robot_id=p['robot_id'], link=p['push_link'])
+        self.agent = TelemetryAgent(cfg, client, outbox or Outbox(p['queue_db_path']), push=push)
         a = self.agent
 
         self.create_subscription(RobotAppStatus, '/robot/app_status', self.on_app_status, LATCHED)
@@ -150,6 +155,7 @@ class TelemetryNode(Node):
             'status_period_s': 5.0, 'app_status_stale_s': 6.0,
             'publish_sos_location': True, 'publish_diag': False, 'max_events': 1000,
             'marker_track_topic': '/marker_track',
+            'push_enabled': True, 'push_link': 'https://senior-care-dashboard.vercel.app/', 'senior_name': '어르신',
         }
         out = {}
         for name, default in defaults.items():
