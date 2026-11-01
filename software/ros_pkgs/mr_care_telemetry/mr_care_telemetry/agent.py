@@ -9,6 +9,7 @@
 - RTDB가 400(키 규칙 위반 등)으로 거절한 쓰기는 로그 ERROR로 드러낸다(대상마다 처음 한 번, 그 뒤 5분마다 묶어서).
   diag.recent_errors에만 넣으면 diag 자체가 거절될 때 아무도 모른다.
 - 이벤트에는 좌표를 넣지 않는다. 폰 위치는 SOS 중에만 `sos/{id}`에 쓰고 sos.clear에서 지운다.
+- 이 실행이 모르는 `sos/{id}`는 이전 실행의 잔재다: 이전 큐를 다 보낸 뒤 한 번 sos.clear(unknown)을 남기고 지운다.
 """
 from __future__ import annotations
 
@@ -100,6 +101,7 @@ class TelemetryAgent:
         self._backoff_s = 0.0
         self._next_send_at = 0.0
         self._meta_done = False
+        self._sos_swept = False
         self._next_prune_at = 0.0
         self._rejected: dict[str, dict] = {}     # 영구 오류가 난 대상 → 로그 묶음 상태
 
@@ -468,6 +470,8 @@ class TelemetryAgent:
             if not self._meta_done:
                 return
         self._drain(now)
+        if not self._sos_swept and not len(self.outbox):    # 이전 실행의 PATCH가 노드를 되살리지 않게 큐가 빈 뒤에
+            self._sweep_stale_sos()
         if self._backoff_s == 0 and now >= self._next_prune_at:
             self._prune()
             self._next_prune_at = now + self.cfg.prune_period_s
@@ -516,6 +520,35 @@ class TelemetryAgent:
             else:                        # 다시 보내도 같다. meta 때문에 큐를 막지 않는다
                 self._rejected_write('meta', e)
                 self._meta_done = True
+
+    def _sweep_stale_sos(self) -> None:
+        """Pi가 SOS 도중 꺼지면 mission도 sos_clear를 못 내서 노드가 대시보드에 영영 남는다(2026-11-01).
+        텔레메트리만 다시 켜진 동안 열려 있던 SOS도 여기서 닫힌다. sos.request 이벤트는 남고, 늦게 온 clear는 무시한다."""
+        if not self.cfg.publish_sos_location:
+            self._sos_swept = True
+            return
+        path = f'{self.root}/sos'
+        try:
+            nodes = self.client.get(path) or {}
+        except RtdbError as e:
+            if e.transient:
+                self._fail(e)
+            else:
+                self._rejected_write('sos sweep', e)
+                self._sos_swept = True
+            return
+        self._sos_swept = True
+        with self._lock:
+            live = {M.safe_key(w) for w in (*self.sos, *self.sos_closed)}
+            for key, node in nodes.items():
+                if key in live:
+                    continue
+                trip = node.get('trip_id') if isinstance(node, dict) else None
+                self.sos_closed.append(key)
+                self._emit('sos.clear', 'info', M.SOS_CLEAR_MESSAGES['unknown'],
+                           trip_id=trip if isinstance(trip, str) else None, sos_id=key, data={'resolution': 'unknown'})
+                self.outbox.put('DELETE', f'{path}/{key}')
+                log.warning('closed SOS %s left open by a previous run', key)
 
     def _drain(self, now: float) -> None:
         while not self._stop.is_set() or self._flushing:

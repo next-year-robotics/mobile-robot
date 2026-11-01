@@ -193,6 +193,26 @@ def test_sos_location_updates_limited(rig):
     assert len(patches) == 3
 
 
+def test_sos_left_by_previous_run_is_closed(rig, schemas):
+    stale = '32b4b536-7069-4fc0-b912-590f23a92c8d'                         # Pi가 SOS 도중 꺼져 clear가 없었다
+    rig.db.put(f'robots/mr-001/sos/{stale}', {'started_at_ms': rig.ms - 600_000, 'updated_at_ms': rig.ms - 600_000,
+                                              'reason': 'tracking_lost', 'severity': 'critical', 'trip_id': TRIP,
+                                              'app_received': False})
+    rig.agent.outbox.put('PATCH', f'robots/mr-001/sos/{stale}', {'app_received': True})   # 이전 실행이 못 보낸 것
+    a = rig.agent
+    a.on_sos_request(sos_id=SOS, reason='manual', severity='critical', trip_id=None)        # 이번 실행의 SOS는 남는다
+    rig.step(n=2)
+    assert rig.db.at(f'robots/mr-001/sos/{stale}') is None
+    assert rig.db.at(f'robots/mr-001/sos/{SOS}')['reason'] == 'manual'
+    clear = [e for e in rig.events() if e['kind'] == 'sos.clear']
+    assert len(clear) == 1 and clear[0]['sos_id'] == stale and clear[0]['trip_id'] == TRIP
+    assert clear[0]['data'] == {'resolution': 'unknown'} and clear[0]['message'] == 'SOS가 종료되었어요'
+    schemas.check('event', clear[0])
+    a.on_sos_clear(sos_id=stale, resolution='cancelled')                   # 늦게 온 clear: 두 번 닫지 않는다
+    rig.step()
+    assert rig.kinds().count('sos.clear') == 1
+
+
 def test_periodic_location_never_written(rig):
     rig.agent.on_location(reason='periodic', sos_id=None, has_fix=True, lat=36.1, lon=128.5, accuracy_m=5.0,
                           captured_at_ms=rig.ms, source='cache', low_confidence=False)
