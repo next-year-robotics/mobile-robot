@@ -1,0 +1,10 @@
+# RPLIDAR C1 (CP210x USB-UART, 10c4:ea60) -> /dev/rplidar
+#
+# sllidar_ros2 scripts/rplidar.rules와 같은 조건이다. 권한만 0777 대신 0666으로 둔다.
+#   sudo cp 99-rplidar.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#   ls -l /dev/rplidar
+#
+# 같은 CP210x 칩을 쓰는 USB 장치를 하나 더 꽂으면 둘 다 이 이름을 다툰다.
+# 그때는 `udevadm info -a /dev/ttyUSB0`의 ATTRS{serial}을 조건에 더한다.
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666", SYMLINK+="rplidar"

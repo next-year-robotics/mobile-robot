@@ -1,0 +1,25 @@
+# RPLIDAR C1 드라이버(Slamtec sllidar_ros2). /scan을 laser_link로 낸다.
+#
+# apt의 ros-jazzy-rplidar-ros(2.1.0)는 C1을 모른다. C1 지원은 그 뒤 미출시 커밋에만 있다.
+# 그래서 Slamtec sllidar_ros2를 Pi 작업공간에 소스로 넣는다(2026-11-10 기준 main 3430009).
+#
+#   cd ~/ros2_ws/src && git clone https://github.com/Slamtec/sllidar_ros2.git
+#   cd ~/ros2_ws && colcon build --packages-select sllidar_ros2 --parallel-workers 2
+#   sudo cp <mr_bringup>/config/udev/99-rplidar.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# 각도 규약: 노드가 "ROS 각도 = π − 라이다 각도"로 뒤집어 낸다. 실제로 +x가 어디를 보는지는
+# 장착한 뒤 상자를 앞에 두고 확인하고, 틀리면 URDF laser_link yaw로 고친다(드라이버는 건드리지 않는다).
+sllidar_node:
+  ros__parameters:
+    channel_type: serial
+    # udev 규칙이 만드는 고정 이름. MCU는 /dev/ttyAMA0라 겹치지 않지만 ttyUSB 번호는 꽂는 순서로 바뀐다.
+    serial_port: /dev/rplidar
+    # C1 고정값. 노드 기본값 1000000으로는 연결되지 않는다.
+    serial_baudrate: 460800
+    # mr_description URDF의 링크 이름과 같아야 한다. 노드 기본값 laser_frame은 tf에 없다.
+    frame_id: laser_link
+    inverted: false
+    # 한 바퀴를 고른 각도 간격으로 다시 나눠 낸다. slam_toolbox가 고정 간격을 기대한다.
+    angle_compensate: true
+    scan_mode: Standard

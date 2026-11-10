@@ -64,6 +64,7 @@ def test_link_and_joint_contract(robot: ET.Element) -> None:
         "camera_link",
         "camera_optical_frame",
         "imu_link",
+        "laser_link",
     }
     assert _joint(robot, "left_wheel_joint").attrib["type"] == "continuous"
     assert _joint(robot, "right_wheel_joint").attrib["type"] == "continuous"
@@ -131,6 +132,19 @@ def test_imu_frame_matches_params(robot: ET.Element, params: dict) -> None:
     assert _floats(origin.attrib["xyz"]) == pytest.approx(params["imu_xyz_m"], abs=1.0e-9)
     assert _floats(origin.attrib["rpy"]) == pytest.approx(
         [math.radians(value) for value in params["imu_rpy_deg"]], abs=1.0e-9
+    )
+
+
+def test_lidar_frame_matches_params(robot: ET.Element, params: dict) -> None:
+    # /scan은 laser_link로 나온다. slam_toolbox와 costmap이 이 frame을 tf로 찾는다.
+    joint = _joint(robot, "laser_joint")
+    assert joint.attrib["type"] == "fixed"
+    assert joint.find("parent").attrib["link"] == "base_link"
+    assert joint.find("child").attrib["link"] == "laser_link"
+    origin = joint.find("origin")
+    assert _floats(origin.attrib["xyz"]) == pytest.approx(params["lidar_xyz_m"], abs=1.0e-9)
+    assert _floats(origin.attrib["rpy"]) == pytest.approx(
+        [math.radians(value) for value in params["lidar_rpy_deg"]], abs=1.0e-9
     )
 
 

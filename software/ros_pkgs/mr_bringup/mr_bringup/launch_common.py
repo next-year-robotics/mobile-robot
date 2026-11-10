@@ -260,3 +260,37 @@ def build_base(serial_device: str = '/dev/ttyAMA0', baud: str = '921600',
             parameters=[share('mr_bringup', 'config', 'ekf.yaml')],
         ))
     return nodes
+
+
+def build_lidar(lidar_device: str = '') -> list:
+    """RPLIDAR C1 — /scan(laser_link). 장치·baud·frame은 config/lidar.yaml.
+
+    sllidar_ros2는 apt가 아니라 작업공간 소스다(lidar.yaml 머리 주석).
+    """
+    params = [share('mr_bringup', 'config', 'lidar.yaml')]
+    if lidar_device:
+        params.append({'serial_port': lidar_device})
+    return [Node(
+        package='sllidar_ros2',
+        executable='sllidar_node',
+        name='sllidar_node',
+        output='screen',
+        parameters=params,
+    )]
+
+
+def build_slam() -> list:
+    """slam_toolbox 온라인 비동기 지도 작성 — /map, TF map → odom.
+
+    slam_toolbox jazzy는 lifecycle 노드라 configure·activate 순서를 업스트림 launch에
+    맡긴다. 업스트림 기본값이 use_sim_time=true라서 꼭 false로 넘긴다. 그대로 두면
+    /clock을 기다리며 지도를 하나도 만들지 않는다.
+    """
+    return [IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            share('slam_toolbox', 'launch', 'online_async_launch.py')),
+        launch_arguments={
+            'use_sim_time': 'false',
+            'slam_params_file': share('mr_bringup', 'config', 'slam_toolbox.yaml'),
+        }.items(),
+    )]

@@ -26,6 +26,15 @@ wheel_width_m: 0.024
 imu_xyz_m: [0.010, -0.160, 0.090]
 imu_rpy_deg: [-1.0, 2.1, 177.5]
 
+# RPLIDAR C1 scan origin -> laser_link (sllidar_node frame_id).
+# PROVISIONAL (2026-11-10): connected to the Pi, mount not measured. Placeholder
+# centred on top of the aluminium frame (top at z = 0.4065 from base_link) plus
+# about 30 mm to the scan plane. Replace both lines with measured values.
+# Check yaw on the robot: with RViz fixed frame base_link, a box placed in front
+# must appear at +x. Fix a 180 deg error here, not in the driver.
+lidar_xyz_m: [0.025, 0.000, 0.435]
+lidar_rpy_deg: [0.0, 0.0, 0.0]
+
 # The independent CAD preserves the measured cart STEP origin.  Apply this
 # translation in base_link before the millimetre STL is scaled to metres.
 cart_frame_mesh_origin_from_base_link_m: [0.025, 0.000, -0.043482687]

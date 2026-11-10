@@ -1,0 +1,81 @@
+# slam_toolbox 온라인 비동기 지도 작성. /scan + TF odom → base_footprint를 받아
+# /map과 TF map → odom을 낸다.
+#
+# slam_toolbox jazzy의 config/mapper_params_online_async.yaml을 그대로 옮기고
+# "바꿈" 표시한 줄만 이 로봇에 맞췄다. 나머지는 업스트림 기본값이다.
+slam_toolbox:
+  ros__parameters:
+
+    # Plugin params
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # ROS Parameters
+    odom_frame: odom                 # EKF가 낸다(ekf.yaml odom_frame)
+    map_frame: map
+    base_frame: base_footprint       # mr_base base_frame_id, ekf base_link_frame과 같다
+    scan_topic: /scan
+    use_map_saver: true
+    mode: mapping
+
+    debug_logging: false
+    throttle_scans: 1
+    transform_publish_period: 0.02
+    map_update_interval: 5.0
+    resolution: 0.05
+    restamp_tf: false
+    # 바꿈(0.0): 장착부나 케이블에 맞은 10 cm 안쪽 점은 버린다. C1 최소 거리는 5 cm다.
+    min_laser_range: 0.1
+    # 바꿈(20.0): C1 측정 범위는 12 m(흰 면)이고, 먼 점일수록 성기고 어두운 면에서 흔들린다.
+    max_laser_range: 10.0
+    minimum_time_interval: 0.5
+    transform_timeout: 0.2
+    tf_buffer_duration: 30.0
+    stack_size_to_use: 40000000
+    enable_interactive_mode: true
+
+    # General Parameters
+    use_scan_matching: true
+    use_scan_barycenter: true
+    # 바꿈(0.5, 0.5): 방 몇 개 크기 실내다. 0.5 m마다 한 장이면 루프를 닫을 만큼 스캔이 안 쌓인다.
+    # 회전은 EKF(자이로)가 잡아 주므로 제자리 회전에서도 스캔을 받아 둔다.
+    minimum_travel_distance: 0.2
+    minimum_travel_heading: 0.2
+    check_min_dist_and_heading_precisely: false
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance: 1.5
+    loop_search_maximum_distance: 3.0
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45
+
+    # Correlation Parameters - Correlation Parameters
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+
+    # Correlation Parameters - Loop Closure Parameters
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    # Scan Matcher Parameters
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 1.0
+
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
+    min_pass_through: 2
+    occupancy_threshold: 0.1

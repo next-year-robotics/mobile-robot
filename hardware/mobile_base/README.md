@@ -48,6 +48,12 @@ board. With these values, gravity lies on base_link +Z on a flat floor.
 The camera optical centre is therefore 410 mm above the floor and 250 mm in
 front of the drive axle. It is centred laterally and looks straight forward.
 
+The RPLIDAR C1 `laser_link` is not part of the confirmed set. It was wired to
+the Pi on 2026-11-10 before its mount was measured, so `robot_params.yaml`
+holds a placeholder centred on the frame top (`[0.025, 0.000, 0.435]` m, no
+rotation). Replace it with the measured scan-plane origin, and check the yaw
+on the robot with an object placed in front.
+
 ## Derived-value checks
 
 ```text
