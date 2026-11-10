@@ -203,12 +203,17 @@ def build_teleop() -> list:
     ]
 
 
-def build_base(serial_device: str = '/dev/ttyAMA0', baud: str = '921600') -> list:
-    """micro-ROS 에이전트 + 오도메트리 노드.
+def build_base(serial_device: str = '/dev/ttyAMA0', baud: str = '921600',
+               ekf: bool = True) -> list:
+    """micro-ROS 에이전트 + 오도메트리 + IMU 중계 + EKF.
 
     baud와 장치는 계약이 정한 확정값이다(base_contract.md "물리 트랜스포트").
     ROS_DOMAIN_ID는 펌웨어가 0으로 정해 놨다 — 셸에 23이 남아 있으면 토픽이
     보이는데 데이터가 없는 고장이 난다.
+
+    ekf가 참이면 TF odom → base_footprint는 EKF(바퀴 + 자이로)가 내고 odom_node는
+    /odom 토픽만 낸다. 거짓이면 예전처럼 odom_node가 바퀴만으로 TF를 낸다.
+    EKF는 imu_link TF가 있어야 자이로를 쓰므로 build_description과 같이 띄운다.
     """
     # micro_ros_agent는 apt/주 작업공간이 아니라 전용 작업공간에 설치돼 있다.
     # launch를 어느 셸에서 실행해도 한 명령으로 기동되도록 그 환경을 명시해
@@ -217,7 +222,8 @@ def build_base(serial_device: str = '/dev/ttyAMA0', baud: str = '921600') -> lis
     microros_agent = os.path.expanduser(
         '~/microros_ws/install/micro_ros_agent/lib/micro_ros_agent/'
         'micro_ros_agent')
-    return [
+    base_params = share('mr_base', 'config', 'base_params.yaml')
+    nodes = [
         ExecuteProcess(
             cmd=[
                 '/bin/bash', '-c',
@@ -233,6 +239,24 @@ def build_base(serial_device: str = '/dev/ttyAMA0', baud: str = '921600') -> lis
             executable='odom_node',
             name='mr_base',
             output='screen',
-            parameters=[share('mr_base', 'config', 'base_params.yaml')],
+            # TF 한 칸에는 발행자가 하나뿐이어야 한다. EKF가 뜨면 odom_node는 TF를 내려놓는다.
+            parameters=[base_params, {'publish_tf': not ekf}],
+        ),
+        # /imu/data_raw(공분산 0) → /imu/data(공분산 채움). EKF는 공분산으로 가중치를 매긴다.
+        Node(
+            package='mr_base',
+            executable='imu_node',
+            name='mr_imu',
+            output='screen',
+            parameters=[base_params],
         ),
     ]
+    if ekf:
+        nodes.append(Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_filter_node',
+            output='screen',
+            parameters=[share('mr_bringup', 'config', 'ekf.yaml')],
+        ))
+    return nodes

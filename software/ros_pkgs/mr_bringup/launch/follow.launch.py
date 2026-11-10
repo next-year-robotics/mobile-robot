@@ -21,7 +21,8 @@ def _setup(context, *args, **kwargs):
     nodes = build_description()
     if LaunchConfiguration('base').perform(context) == 'true':
         nodes += build_base(
-            serial_device=LaunchConfiguration('serial_device').perform(context))
+            serial_device=LaunchConfiguration('serial_device').perform(context),
+            ekf=LaunchConfiguration('ekf').perform(context) == 'true')
     nodes += build_camera(
         video_device=LaunchConfiguration('video_device').perform(context))
     nodes += build_aruco_tracker()
@@ -43,6 +44,10 @@ def generate_launch_description() -> LaunchDescription:
             'base', default_value='true',
             description='micro-ROS 에이전트와 오도메트리를 같이 띄울지. '
                         '노트북에서 인지만 볼 때는 false.'),
+        DeclareLaunchArgument(
+            'ekf', default_value='true',
+            description='EKF(바퀴 + 자이로)가 odom → base_footprint를 낸다. '
+                        'false면 예전처럼 바퀴만으로 낸다.'),
         DeclareLaunchArgument(
             'teleop', default_value='true',
             description='Xbox 패드 수동 개입. LB를 쥐면 자율 입력을 누른다.'),
