@@ -15,6 +15,7 @@ firmware/base_controller/micro_ros/README.md
 firmware/base_controller/test
 software/ros_pkgs/mr_base/test
 /output/pdf
+.research_archive
 
 # Repository-local generated and tool artifacts
 /generated/
