@@ -7,7 +7,10 @@
     ros2 launch mr_bringup slam.launch.py
     # LB를 쥐고 천천히 돈다. 출발한 자리로 돌아와 루프를 닫는다.
     mkdir -p ~/maps
-    ros2 run nav2_map_server map_saver_cli -f ~/maps/<이름>     # .pgm + .yaml, Nav2 map_server용
+    # .pgm + .yaml, Nav2 map_server용. slam_toolbox는 /map을 transient local로 5 s마다 내므로
+    # 그 QoS로 받아야 한다. 기본값으로는 2 s 안에 못 받아 "Failed to spin map subscription"이 난다.
+    ros2 run nav2_map_server map_saver_cli -f ~/maps/<이름> \
+        --ros-args -p map_subscribe_transient_local:=true -p save_map_timeout:=10.0
     ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph \
         "{filename: '/home/emjdpi/maps/<이름>'}"                  # 나중에 이어 그리기용
 

@@ -29,13 +29,14 @@ wheel_width_m:        0.024
 imu_xyz_m:            [0.010, -0.160, 0.090]
 imu_rpy_deg:          [-1.0, 2.1, 177.5]
 
-# --- LiDAR frame (laser_link), PROVISIONAL 2026-11-10 ---
-# RPLIDAR C1 is wired to the Pi but its mount is not measured yet. Placeholder:
-# centred on top of the aluminium frame (frame top z = 0.4065 from base_link)
-# plus about 30 mm to the scan plane. Replace both lines with measured values.
-# Yaw is checked on the robot, not assumed: a box in front must show at +x.
-lidar_xyz_m:          [0.025, 0.000, 0.435]
-lidar_rpy_deg:        [0.0, 0.0, 0.0]
+# --- LiDAR frame (laser_link), 2026-11-10 ---
+# RPLIDAR C1 on the middle shelf. Scan window 250 mm above the floor (measured).
+# x/y and yaw come from the four corner posts that cross the scan plane
+# (fit rms 12 mm), and match people standing in front and on the left.
+# The top arrow points forward, so the driver's 0 deg points backward: yaw ~180.
+# Yaw re-fitted after the sensor was fixed down (it had turned 5 deg while loose).
+lidar_xyz_m:          [0.018, -0.004, 0.200]
+lidar_rpy_deg:        [0.0, 0.0, 177.5]
 
 # --- Measured total mass and URDF link-mass budget ---
 # The three link classes below sum to the measured 9.8 kg total.  The chassis
