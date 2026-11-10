@@ -29,6 +29,14 @@ wheel_width_m:        0.024
 imu_xyz_m:            [0.010, -0.160, 0.090]
 imu_rpy_deg:          [-1.0, 2.1, 177.5]
 
+# --- LiDAR frame (laser_link), PROVISIONAL 2026-11-10 ---
+# RPLIDAR C1 is wired to the Pi but its mount is not measured yet. Placeholder:
+# centred on top of the aluminium frame (frame top z = 0.4065 from base_link)
+# plus about 30 mm to the scan plane. Replace both lines with measured values.
+# Yaw is checked on the robot, not assumed: a box in front must show at +x.
+lidar_xyz_m:          [0.025, 0.000, 0.435]
+lidar_rpy_deg:        [0.0, 0.0, 0.0]
+
 # --- Measured total mass and URDF link-mass budget ---
 # The three link classes below sum to the measured 9.8 kg total.  The chassis
 # allocation includes the frame, casters, spring drives, motors, and hardware.

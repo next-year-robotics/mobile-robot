@@ -32,6 +32,13 @@
   <xacro:arg name="imu_roll" default="-0.017453293"/>
   <xacro:arg name="imu_pitch" default="0.036651914"/>
   <xacro:arg name="imu_yaw" default="3.097959422"/>
+  <!-- RPLIDAR C1 scan origin, PROVISIONAL (config/robot_params.yaml lidar_*). -->
+  <xacro:arg name="lidar_x" default="0.025"/>
+  <xacro:arg name="lidar_y" default="0.000"/>
+  <xacro:arg name="lidar_z" default="0.435"/>
+  <xacro:arg name="lidar_roll" default="0.0"/>
+  <xacro:arg name="lidar_pitch" default="0.0"/>
+  <xacro:arg name="lidar_yaw" default="0.0"/>
   <!-- 8.6 + 0.5 + 0.5 + 0.2 = measured complete-robot mass 9.8 kg. -->
   <xacro:arg name="chassis_mass" default="8.6"/>
   <xacro:arg name="wheel_mass" default="0.5"/>
@@ -69,6 +76,12 @@
   <xacro:property name="imu_roll_v" value="$(arg imu_roll)"/>
   <xacro:property name="imu_pitch_v" value="$(arg imu_pitch)"/>
   <xacro:property name="imu_yaw_v" value="$(arg imu_yaw)"/>
+  <xacro:property name="lidar_x_v" value="$(arg lidar_x)"/>
+  <xacro:property name="lidar_y_v" value="$(arg lidar_y)"/>
+  <xacro:property name="lidar_z_v" value="$(arg lidar_z)"/>
+  <xacro:property name="lidar_roll_v" value="$(arg lidar_roll)"/>
+  <xacro:property name="lidar_pitch_v" value="$(arg lidar_pitch)"/>
+  <xacro:property name="lidar_yaw_v" value="$(arg lidar_yaw)"/>
 
   <material name="aluminium">
     <color rgba="0.62 0.68 0.78 1.0"/>
@@ -206,5 +219,16 @@
     <child link="imu_link"/>
     <origin xyz="${imu_x_v} ${imu_y_v} ${imu_z_v}"
             rpy="${imu_roll_v} ${imu_pitch_v} ${imu_yaw_v}"/>
+  </joint>
+
+  <!-- RPLIDAR C1 scan origin. /scan is published in this frame (sllidar_node
+       frame_id), so a mount rotation or a 180 deg scan offset is fixed here.
+       Frame only: the sensor's mass is not in the measured 9.8 kg budget yet. -->
+  <link name="laser_link"/>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_link"/>
+    <origin xyz="${lidar_x_v} ${lidar_y_v} ${lidar_z_v}"
+            rpy="${lidar_roll_v} ${lidar_pitch_v} ${lidar_yaw_v}"/>
   </joint>
 </robot>

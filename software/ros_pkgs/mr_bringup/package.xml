@@ -16,6 +16,10 @@
   <exec_depend>aruco_opencv</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>robot_localization</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <!-- sllidar_ros2(RPLIDAR C1)는 apt가 아니라 작업공간 소스다. config/lidar.yaml 참고. -->
+  <exec_depend>sllidar_ros2</exec_depend>
   <exec_depend>v4l-utils</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>mr_base</exec_depend>

@@ -27,6 +27,8 @@ def _xacro_mappings(params: dict) -> dict[str, str]:
     mesh_origin = params["cart_frame_mesh_origin_from_base_link_m"]
     imu_xyz = params["imu_xyz_m"]
     imu_rpy = [radians(value) for value in params["imu_rpy_deg"]]
+    lidar_xyz = params["lidar_xyz_m"]
+    lidar_rpy = [radians(value) for value in params["lidar_rpy_deg"]]
     return {
         "base_link_z": _number(params["base_link_z_m"]),
         "camera_x": _number(camera_xyz[0]),
@@ -60,6 +62,12 @@ def _xacro_mappings(params: dict) -> dict[str, str]:
         "imu_roll": _number(imu_rpy[0]),
         "imu_pitch": _number(imu_rpy[1]),
         "imu_yaw": _number(imu_rpy[2]),
+        "lidar_x": _number(lidar_xyz[0]),
+        "lidar_y": _number(lidar_xyz[1]),
+        "lidar_z": _number(lidar_xyz[2]),
+        "lidar_roll": _number(lidar_rpy[0]),
+        "lidar_pitch": _number(lidar_rpy[1]),
+        "lidar_yaw": _number(lidar_rpy[2]),
     }
 
 
