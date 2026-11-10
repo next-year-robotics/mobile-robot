@@ -12,6 +12,7 @@ mr_base:
     base_frame_id: base_footprint
     left_wheel_joint: left_wheel_joint
     right_wheel_joint: right_wheel_joint
+    # 단독 실행용 기본값이다. mr_bringup이 EKF를 띄우면 false로 덮어 TF를 EKF에 넘긴다.
     publish_tf: true
 
     # wheel-only 오도메트리가 관측하지 못하는 자유도(z, roll, pitch)와 횡슬립을

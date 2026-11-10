@@ -10,15 +10,20 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 
-from mr_bringup.launch_common import build_base, build_teleop, build_twist_mux
+from mr_bringup.launch_common import (
+    build_base, build_description, build_teleop, build_twist_mux,
+)
 
 
 def _setup(context, *args, **kwargs):
     del args, kwargs
     nodes = []
     if LaunchConfiguration('base').perform(context) == 'true':
+        # EKF가 자이로를 base_footprint 축으로 돌리려면 base_footprint → imu_link TF가 있어야 한다.
+        nodes += build_description()
         nodes += build_base(
-            serial_device=LaunchConfiguration('serial_device').perform(context))
+            serial_device=LaunchConfiguration('serial_device').perform(context),
+            ekf=LaunchConfiguration('ekf').perform(context) == 'true')
     nodes += build_twist_mux()
     nodes += build_teleop()
     return nodes
@@ -31,5 +36,9 @@ def generate_launch_description() -> LaunchDescription:
             'base', default_value='true',
             description='micro-ROS 에이전트와 오도메트리를 같이 띄울지. '
                         'false면 /cmd_vel까지만 나오고 바퀴는 안 돈다.'),
+        DeclareLaunchArgument(
+            'ekf', default_value='true',
+            description='EKF(바퀴 + 자이로)가 odom → base_footprint를 낸다. '
+                        'false면 예전처럼 바퀴만으로 낸다.'),
         OpaqueFunction(function=_setup),
     ])
