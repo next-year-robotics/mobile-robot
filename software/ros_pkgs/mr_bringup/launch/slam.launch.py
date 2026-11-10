@@ -14,7 +14,13 @@
     ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph \
         "{filename: '/home/emjdpi/maps/<이름>'}"                  # 나중에 이어 그리기용
 
-노트북 RViz: Fixed Frame `map`, LaserScan `/scan`(QoS Best Effort도 된다), Map `/map`.
+노트북에서 지도가 그려지는 것을 보려면(같은 망, ROS_DOMAIN_ID=0, 로봇 메시는 노트북에
+mr_description이 빌드돼 있어야 보인다):
+
+    ROS_DOMAIN_ID=0 rviz2 -d <mr_bringup share>/rviz/slam.rviz
+
+Mesa에서 Map 표시가 `indexed_8bit_image ... active samplers` 셰이더 오류를 찍지만
+지도는 그려진다(2026-11-10 확인).
 
 처음 장착한 뒤에는 `slam:=false`로 띄워 방향부터 본다. Fixed Frame을 `base_link`로 두고
 로봇 앞에 상자를 놓았을 때 +x에 찍혀야 한다. 그다음 Fixed Frame `odom`, Decay Time 10 s로
