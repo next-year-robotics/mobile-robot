@@ -109,11 +109,31 @@ void app_on_rx_rearm_failed(void)
 /* ------------------------------------------------------------------------- */
 
 /**
+  * @brief  USART2 ASCII 링크 고장(송신·줄 조립·수신 재무장)을 처리한다.
+  * @note   ASCII 링크가 지령 경로인 빌드에서는 즉시 PWM을 끊고 ControlTask에 fault를 래치시킨다.
+  *         micro-ROS 빌드에서는 세기만 한다. 지령은 UART1 `/cmd_vel`로 오고 stamp 판정과
+  *         워치독이 따로 지킨다. 이 링크는 아무도 읽지 않는 50 Hz `ticks` 줄을 블로킹으로
+  *         내보내는데(UART_TX_TIMEOUT_MS 10 ms), LegacyIoTask가 MicroRosTask보다 낮은
+  *         우선순위라 밀리면 시간 초과가 난다. 여기서 래치하면 줄 하나 때문에 리셋 전까지
+  *         모터가 막힌다(2026-08-30 두 번, 10-31 부스 리허설 한 번: 링크·시계는 정상인데
+  *         `cmd_age_s`만 계속 자랐다). 계측은 g_tx_fail_count 등으로 SWD에서 본다.
+  */
+static void legacy_link_fault(uint32_t fault_flag)
+{
+#if MICRO_ROS
+  (void)fault_flag;
+#else
+  platform_motor_kill();
+  app_link_urgent_stop(fault_flag);
+#endif
+}
+
+/**
   * @brief  한 줄을 조립해 내보낸다. 실패는 계측하고 안전 상태로 넘어간다.
-  * @note   빌더가 capacity를 실제로 검사하므로 넘치는 줄은 송신되지 않는다. 송신
-  *         실패는 치명 경로다. platform_motor_kill()은 RTOS와 무관하게 즉시 부를 수
-  *         있는 유일한 예외다. 그 뒤 ControlTask에도 fault를 래치시켜 이후 명령을
-  *         `err`로 만든다.
+  * @note   빌더가 capacity를 실제로 검사하므로 넘치는 줄은 송신되지 않는다. ASCII 링크가
+  *         지령 경로인 빌드에서 송신 실패는 치명 경로다. platform_motor_kill()은 RTOS와
+  *         무관하게 즉시 부를 수 있는 유일한 예외다. 그 뒤 ControlTask에도 fault를 래치시켜
+  *         이후 명령을 `err`로 만든다. micro-ROS 빌드는 legacy_link_fault()를 본다.
   */
 static void send_line(const char *tag, const int64_t *values, size_t count)
 {
@@ -124,16 +144,14 @@ static void send_line(const char *tag, const int64_t *values, size_t count)
                   &offset, &length))
   {
     g_tx_build_fail_count++;
-    platform_motor_kill();
-    app_link_urgent_stop(MOTOR_FAULT_TX_BUILD);
+    legacy_link_fault(MOTOR_FAULT_TX_BUILD);
     return;
   }
 
   if (!platform_uart_send(&g_tx_buffer[offset], length))
   {
     g_tx_fail_count++;
-    platform_motor_kill();
-    app_link_urgent_stop(MOTOR_FAULT_TX);
+    legacy_link_fault(MOTOR_FAULT_TX);
   }
 }
 
@@ -205,8 +223,7 @@ static void rx_rearm_if_needed(void)
   g_rx_rearm_fail_run++;
   if (g_rx_rearm_fail_run >= CMD_RX_REARM_FAIL_LIMIT)
   {
-    platform_motor_kill();
-    app_link_urgent_stop(MOTOR_FAULT_RX_REARM);
+    legacy_link_fault(MOTOR_FAULT_RX_REARM);
   }
 }
 
