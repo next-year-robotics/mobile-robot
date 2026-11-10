@@ -28,8 +28,11 @@ slam_toolbox:
     map_update_interval: 5.0
     resolution: 0.05
     restamp_tf: false
-    # 바꿈(0.0): 장착부나 케이블에 맞은 10 cm 안쪽 점은 버린다. C1 최소 거리는 5 cm다.
-    min_laser_range: 0.1
+    # 바꿈(0.0): 카트 모서리 기둥 네 개가 스캔 평면에 걸린다. 2026-11-10 정지 실측에서
+    # ±41°, ±138° 방향 0.25~0.28 m에 폭 5°씩 매 스캔 찍혔다. 그대로 두면 로봇이 지나간
+    # 자리마다 기둥이 장애물로 그려지므로 0.35 m 안쪽은 지도에 넣지 않는다.
+    # (costmap·접근 정지에서는 가까운 점이 필요하니 거기서는 laser_filters로 기둥 각도만 지운다.)
+    min_laser_range: 0.35
     # 바꿈(20.0): C1 측정 범위는 12 m(흰 면)이고, 먼 점일수록 성기고 어두운 면에서 흔들린다.
     max_laser_range: 10.0
     minimum_time_interval: 0.5
@@ -42,10 +45,12 @@ slam_toolbox:
     use_scan_matching: true
     use_scan_barycenter: true
     # 바꿈(0.5, 0.5): 방 몇 개 크기 실내다. 0.5 m마다 한 장이면 루프를 닫을 만큼 스캔이 안 쌓인다.
-    # 회전은 EKF(자이로)가 잡아 주므로 제자리 회전에서도 스캔을 받아 둔다.
     minimum_travel_distance: 0.2
     minimum_travel_heading: 0.2
-    check_min_dist_and_heading_precisely: false
+    # 바꿈(false): false면 노드가 이동 거리만 보고(0.8 × 0.2² → 약 18 cm) 회전량은 보지 않는다.
+    # 2026-11-10 제자리 두 바퀴 동안 지도에 스캔이 한 장도 안 들어갔다. 회전은 EKF(자이로)가
+    # 99.5 % 맞게 잡으니(720° 시험) 0.2 rad 돌기만 해도 스캔을 받게 한다.
+    check_min_dist_and_heading_precisely: true
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1

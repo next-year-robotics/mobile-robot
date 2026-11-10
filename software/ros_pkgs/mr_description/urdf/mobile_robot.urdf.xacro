@@ -32,13 +32,13 @@
   <xacro:arg name="imu_roll" default="-0.017453293"/>
   <xacro:arg name="imu_pitch" default="0.036651914"/>
   <xacro:arg name="imu_yaw" default="3.097959422"/>
-  <!-- RPLIDAR C1 scan origin, PROVISIONAL (config/robot_params.yaml lidar_*). -->
-  <xacro:arg name="lidar_x" default="0.025"/>
-  <xacro:arg name="lidar_y" default="0.000"/>
-  <xacro:arg name="lidar_z" default="0.435"/>
+  <!-- RPLIDAR C1 scan origin (config/robot_params.yaml lidar_*). Yaw 177.5 deg in radians. -->
+  <xacro:arg name="lidar_x" default="0.018"/>
+  <xacro:arg name="lidar_y" default="-0.004"/>
+  <xacro:arg name="lidar_z" default="0.200"/>
   <xacro:arg name="lidar_roll" default="0.0"/>
   <xacro:arg name="lidar_pitch" default="0.0"/>
-  <xacro:arg name="lidar_yaw" default="0.0"/>
+  <xacro:arg name="lidar_yaw" default="3.097959422"/>
   <!-- 8.6 + 0.5 + 0.5 + 0.2 = measured complete-robot mass 9.8 kg. -->
   <xacro:arg name="chassis_mass" default="8.6"/>
   <xacro:arg name="wheel_mass" default="0.5"/>
