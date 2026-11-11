@@ -1,0 +1,5 @@
+SO-ARM101 by TheRobotStudio / SO-ARM100
+Source: https://github.com/TheRobotStudio/SO-ARM100
+Revision: a758567c3978dfeefe282ede0500085a48fe8f78
+License: Apache-2.0; see LICENSE in this folder.
+The 13 STL files are unchanged upstream assets. The assembled URDF prefixes names with arm_, removes ROS 1 transmission tags, makes printed parts white, and represents the zero-inertia gripper TCP as a massless fixed frame. Physical joint axes/limits and link inertias are from upstream. The neutral CAD uses the earlier supplied static pose and convex envelopes for six invalid servo internal solids.

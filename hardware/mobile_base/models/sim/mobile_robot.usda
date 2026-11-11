@@ -1,0 +1,13 @@
+#usda 1.0
+(
+    defaultPrim = "Robot"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "Robot" (
+    prepend references = @mobile_robot.usdc@
+)
+{
+}
+
