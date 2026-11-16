@@ -12,7 +12,7 @@ from launch.substitutions import LaunchConfiguration
 
 from mr_bringup.launch_common import (
     build_aruco_tracker, build_base, build_camera, build_description,
-    build_follow, build_marker_track, build_teleop, build_twist_mux,
+    build_follow, build_lidar, build_marker_track, build_teleop, build_twist_mux,
 )
 
 
@@ -23,9 +23,13 @@ def _setup(context, *args, **kwargs):
         nodes += build_base(
             serial_device=LaunchConfiguration('serial_device').perform(context),
             ekf=LaunchConfiguration('ekf').perform(context) == 'true')
-    nodes += build_camera(
-        video_device=LaunchConfiguration('video_device').perform(context))
-    nodes += build_aruco_tracker()
+    if LaunchConfiguration('camera').perform(context) == 'true':
+        nodes += build_camera(
+            video_device=LaunchConfiguration('video_device').perform(context))
+        nodes += build_aruco_tracker()
+    if LaunchConfiguration('lidar').perform(context) == 'true':
+        nodes += build_lidar(
+            lidar_device=LaunchConfiguration('lidar_device').perform(context))
     nodes += build_marker_track(
         marker_id=int(LaunchConfiguration('marker_id').perform(context)))
     nodes += build_twist_mux()
@@ -39,6 +43,17 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         DeclareLaunchArgument('marker_id', default_value='0'),
         DeclareLaunchArgument('video_device', default_value=''),
+        DeclareLaunchArgument(
+            'camera', default_value='true',
+            description='카메라와 ArUco 검출을 같이 띄울지. 카메라가 노트북에 꽂혀 '
+                        '/aruco_detections를 밖에서 받을 때는 false.'),
+        DeclareLaunchArgument(
+            'lidar', default_value='false',
+            description='RPLIDAR C1(/scan)을 같이 띄울지. 추종 자체는 쓰지 않고, '
+                        '부스 대시보드 표시와 심부름 이동의 장애물 정지가 쓴다.'),
+        DeclareLaunchArgument(
+            'lidar_device', default_value='',
+            description='비우면 lidar.yaml의 /dev/rplidar(udev 규칙)를 쓴다.'),
         DeclareLaunchArgument('serial_device', default_value='/dev/ttyAMA0'),
         DeclareLaunchArgument(
             'base', default_value='true',
