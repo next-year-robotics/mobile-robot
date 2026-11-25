@@ -1,0 +1,311 @@
+# 막내(MAKNAE) Nav2 파라미터 — ROS 2 Jazzy.
+#
+# 물리 치수·프레임·속도 한계는 mr_description/config/robot_params.yaml,
+# mr_base/config/base_params.yaml, mr_bringup/config/ekf.yaml 및 twist_mux.yaml에 맞췄다.
+#
+# - 프레임: map → odom(slam_toolbox 또는 AMCL) → base_footprint(EKF) → base_link → laser_link
+# - 차체 외곽: 0.450 × 0.400 m, 중심 x = +0.025 m(base_footprint 기준)
+#              → [[-0.20, -0.20], [-0.20, 0.20], [0.25, 0.20], [0.25, -0.20]]
+# - 속도 토픽 계약: MCU·twist_mux가 TwistStamped만 받으므로 enable_stamped_cmd_vel: true로 통일하고,
+#   collision_monitor 최종 출력을 /cmd_vel_nav로 내어 twist_mux(prio 55)를 거치게 한다.
+#   패드(teleop 100)·비상정지(estop 255)·근접 마커 정렬(align 60)이 언제나 Nav2보다 우선한다.
+
+amcl:
+  ros__parameters:
+    alpha1: 0.15
+    alpha2: 0.15
+    alpha3: 0.15
+    alpha4: 0.15
+    alpha5: 0.10
+    base_frame_id: "base_footprint"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 10.0
+    laser_min_range: 0.35
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 0.5
+    update_min_a: 0.15
+    update_min_d: 0.15
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: /scan
+    set_initial_pose: true
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odometry/filtered
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    action_server_result_timeout: 900.0
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    error_code_names:
+      - compute_path_error_code
+      - follow_path_error_code
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 20.0
+    costmap_update_timeout: 0.30
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    odom_topic: /odometry/filtered
+    enable_stamped_cmd_vel: true
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    use_realtime_priority: false
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.25
+      movement_time_allowance: 12.0
+
+    general_goal_checker:
+      stateful: true
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.12
+      yaw_goal_tolerance: 0.15
+
+    # 큰 방향 차이는 제자리 회전(RotationShim)으로 먼저 맞춘 뒤 Regulated Pure Pursuit로 추종한다.
+    FollowPath:
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      angular_dist_threshold: 0.45
+      forward_sampling_distance: 0.45
+      rotate_to_heading_angular_vel: 0.55
+      max_angular_accel: 2.0
+      simulate_ahead_time: 1.0
+      rotate_to_goal_heading: true
+
+      # Regulated Pure Pursuit — 막내 실측 속도(0.22 m/s, 0.60 rad/s)에 맞춘 보수적 안전 추종
+      desired_linear_vel: 0.22
+      lookahead_dist: 0.45
+      min_lookahead_dist: 0.28
+      max_lookahead_dist: 0.70
+      lookahead_time: 1.5
+      rotate_to_heading_min_angle: 0.45
+      transform_tolerance: 0.2
+      use_velocity_scaled_lookahead_dist: true
+      min_approach_linear_velocity: 0.06
+      approach_velocity_scaling_dist: 0.50
+      use_collision_detection: true
+      max_allowed_time_to_collision_up_to_carrot: 1.0
+      use_regulated_linear_velocity_scaling: true
+      use_fixed_curvature_lookahead: false
+      curvature_lookahead_dist: 0.25
+      use_cost_regulated_linear_velocity_scaling: true
+      regulated_linear_scaling_min_radius: 0.65
+      regulated_linear_scaling_min_speed: 0.08
+      use_rotate_to_heading: true
+      allow_reversing: false
+      max_robot_pose_search_dist: 2.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_footprint
+      rolling_window: true
+      width: 4
+      height: 4
+      resolution: 0.05
+      footprint: "[[-0.20, -0.20], [-0.20, 0.20], [0.25, 0.20], [0.25, -0.20]]"
+      footprint_padding: 0.03
+      plugins: ["obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 5.0
+          raytrace_min_range: 0.35
+          obstacle_max_range: 4.5
+          obstacle_min_range: 0.35
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.5
+        inflation_radius: 0.45
+      always_send_full_costmap: true
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      footprint: "[[-0.20, -0.20], [-0.20, 0.20], [0.25, 0.20], [0.25, -0.20]]"
+      footprint_padding: 0.03
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 5.0
+          raytrace_min_range: 0.35
+          obstacle_max_range: 4.5
+          obstacle_min_range: 0.35
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.5
+        inflation_radius: 0.45
+      always_send_full_costmap: true
+
+map_saver:
+  ros__parameters:
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: true
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 10.0
+    planner_plugins: ["GridBased"]
+    costmap_update_timeout: 1.0
+    GridBased:
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.25
+      use_astar: true
+      allow_unknown: true
+
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: true
+
+behavior_server:
+  ros__parameters:
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors::DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_footprint
+    transform_tolerance: 0.2
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.60
+    min_rotational_vel: 0.30
+    rotational_acc_lim: 2.0
+    enable_stamped_cmd_vel: true
+
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 20.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.22, 0.0, 0.60]
+    min_velocity: [-0.10, 0.0, -0.60]
+    max_accel: [0.40, 0.0, 2.0]
+    max_decel: [-0.60, 0.0, -2.5]
+    odom_topic: "/odometry/filtered"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 0.5
+    enable_stamped_cmd_vel: true
+
+# 라이다 기반 전방 안전 정지·감속 계층. 최종 출력을 /cmd_vel_nav로 내어 twist_mux(prio 55)를 거친다.
+collision_monitor:
+  ros__parameters:
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_nav_smoothed"
+    cmd_vel_out_topic: "cmd_vel_nav"
+    state_topic: "collision_monitor_state"
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: true
+    stop_pub_timeout: 1.0
+    enable_stamped_cmd_vel: true
+    polygons: ["StopZone", "SlowdownZone"]
+    StopZone:
+      type: "polygon"
+      points: "[[0.25, 0.26], [0.55, 0.26], [0.55, -0.26], [0.25, -0.26]]"
+      action_type: "stop"
+      min_points: 3
+      visualize: true
+      polygon_pub_topic: "collision_monitor/stop_zone"
+      enabled: true
+    SlowdownZone:
+      type: "polygon"
+      points: "[[0.25, 0.30], [0.95, 0.30], [0.95, -0.30], [0.25, -0.30]]"
+      action_type: "slowdown"
+      min_points: 4
+      slowdown_ratio: 0.5
+      visualize: true
+      polygon_pub_topic: "collision_monitor/slowdown_zone"
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "/scan"
+      min_height: 0.05
+      max_height: 2.0
+      enabled: true

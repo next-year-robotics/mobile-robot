@@ -279,7 +279,7 @@ def build_lidar(lidar_device: str = '') -> list:
     )]
 
 
-def build_slam() -> list:
+def build_slam(use_sim_time: bool = False) -> list:
     """slam_toolbox 온라인 비동기 지도 작성 — /map, TF map → odom.
 
     slam_toolbox jazzy는 lifecycle 노드라 configure·activate 순서를 업스트림 launch에
@@ -290,7 +290,151 @@ def build_slam() -> list:
         PythonLaunchDescriptionSource(
             share('slam_toolbox', 'launch', 'online_async_launch.py')),
         launch_arguments={
-            'use_sim_time': 'false',
+            'use_sim_time': str(use_sim_time).lower(),
             'slam_params_file': share('mr_bringup', 'config', 'slam_toolbox.yaml'),
         }.items(),
+    )]
+
+
+def build_nav2(
+    params_file: str = '',
+    map_file: str = '',
+    slam: bool = True,
+    use_sim_time: bool = False,
+    autostart: bool = True,
+) -> list:
+    """Nav2 전역 경로 생성(A*) + Regulated Pure Pursuit + Collision Monitor 스택.
+
+    출력 흐름:
+        controller_server / behavior_server → /cmd_vel_nav_raw
+        → velocity_smoother → /cmd_vel_nav_smoothed
+        → collision_monitor → /cmd_vel_nav
+        → twist_mux (prio 55, TwistStamped) → /cmd_vel
+
+    slam=True이면 slam_toolbox가 /map과 TF map → odom을 내고,
+    slam=False이면서 map_file이 있으면 map_server + AMCL을 띄운다.
+    """
+    cfg = params_file or share('mr_bringup', 'config', 'nav2_params.yaml')
+    sim_param = {'use_sim_time': use_sim_time}
+    nav_nodes = [
+        'controller_server',
+        'smoother_server',
+        'planner_server',
+        'behavior_server',
+        'bt_navigator',
+        'velocity_smoother',
+        'collision_monitor',
+    ]
+    nodes: list = [
+        Node(
+            package='nav2_controller',
+            executable='controller_server',
+            name='controller_server',
+            output='screen',
+            parameters=[cfg, sim_param],
+            remappings=[('cmd_vel', 'cmd_vel_nav_raw')],
+        ),
+        Node(
+            package='nav2_smoother',
+            executable='smoother_server',
+            name='smoother_server',
+            output='screen',
+            parameters=[cfg, sim_param],
+        ),
+        Node(
+            package='nav2_planner',
+            executable='planner_server',
+            name='planner_server',
+            output='screen',
+            parameters=[cfg, sim_param],
+        ),
+        Node(
+            package='nav2_behaviors',
+            executable='behavior_server',
+            name='behavior_server',
+            output='screen',
+            parameters=[cfg, sim_param],
+            remappings=[('cmd_vel', 'cmd_vel_nav_raw')],
+        ),
+        Node(
+            package='nav2_bt_navigator',
+            executable='bt_navigator',
+            name='bt_navigator',
+            output='screen',
+            parameters=[cfg, sim_param],
+        ),
+        Node(
+            package='nav2_velocity_smoother',
+            executable='velocity_smoother',
+            name='velocity_smoother',
+            output='screen',
+            parameters=[cfg, sim_param],
+            remappings=[
+                ('cmd_vel', 'cmd_vel_nav_raw'),
+                ('cmd_vel_smoothed', 'cmd_vel_nav_smoothed'),
+            ],
+        ),
+        Node(
+            package='nav2_collision_monitor',
+            executable='collision_monitor',
+            name='collision_monitor',
+            output='screen',
+            parameters=[cfg, sim_param],
+        ),
+        Node(
+            package='nav2_lifecycle_manager',
+            executable='lifecycle_manager',
+            name='lifecycle_manager_navigation',
+            output='screen',
+            parameters=[
+                sim_param,
+                {'autostart': autostart},
+                {'node_names': nav_nodes},
+            ],
+        ),
+    ]
+    if not slam and map_file:
+        nodes.extend([
+            Node(
+                package='nav2_map_server',
+                executable='map_server',
+                name='map_server',
+                output='screen',
+                parameters=[cfg, sim_param, {'yaml_filename': map_file}],
+            ),
+            Node(
+                package='nav2_amcl',
+                executable='amcl',
+                name='amcl',
+                output='screen',
+                parameters=[cfg, sim_param],
+            ),
+            Node(
+                package='nav2_lifecycle_manager',
+                executable='lifecycle_manager',
+                name='lifecycle_manager_localization',
+                output='screen',
+                parameters=[
+                    sim_param,
+                    {'autostart': autostart},
+                    {'node_names': ['map_server', 'amcl']},
+                ],
+            ),
+        ])
+    return nodes
+
+
+def build_nav2_goal_bridge(
+    use_sim_time: bool = False, global_frame: str = 'map'
+) -> list:
+    """`/nav/command` JSON → Nav2 `NavigateToPose` 브리지."""
+    return [Node(
+        package='mr_bringup',
+        executable='nav2_goal_bridge',
+        name='nav2_goal_bridge',
+        output='screen',
+        parameters=[{
+            'use_sim_time': use_sim_time,
+            'global_frame': global_frame,
+        }],
     )]

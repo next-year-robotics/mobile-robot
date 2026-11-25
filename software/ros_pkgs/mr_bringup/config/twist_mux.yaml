@@ -14,11 +14,16 @@ twist_mux:
         topic: cmd_vel_teleop
         timeout: 0.3
         priority: 100
-      # 정렬은 목표가 있는 짧은 동작이라 추종보다 위다.
+      # 정렬은 목표가 있는 짧은 동작이라 추종·전역 주행보다 위다.
       align:
         topic: cmd_vel_align
         timeout: 0.3
         priority: 60
+      # Nav2 전역 경로 주행(collision_monitor 출력). 근접 마커 정렬(align)과 패드(teleop) 아래다.
+      nav:
+        topic: cmd_vel_nav
+        timeout: 0.5
+        priority: 55
       follow:
         topic: cmd_vel_follow
         timeout: 0.3
