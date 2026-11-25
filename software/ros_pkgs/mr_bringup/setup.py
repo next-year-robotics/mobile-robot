@@ -20,6 +20,12 @@ setup(
     zip_safe=True,
     maintainer='emjdp',
     maintainer_email='seongho06@khu.ac.kr',
-    description='launch 파일과 카메라·twist_mux 설정.',
+    description='launch 파일과 카메라·twist_mux·SLAM·Nav2 설정.',
     license='Apache-2.0',
+    entry_points={
+        'console_scripts': [
+            'nav2_goal_bridge = mr_bringup.nav2_goal_bridge:main',
+            'nav2_sim_robot = mr_bringup.nav2_sim_robot:main',
+        ],
+    },
 )

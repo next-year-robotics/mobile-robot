@@ -1,0 +1,184 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 32; 36; 44
+    Fixed Frame: map
+    Frame Rate: 30
+  Displays:
+    - Alpha: 0.3
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 110; 116; 128
+      Enabled: true
+      Name: Grid 1 m
+      Plane: XY
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+    - Alpha: 0.85
+      Class: rviz_default_plugins/Map
+      Color Scheme: map
+      Draw Behind: true
+      Enabled: true
+      Name: Map
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map
+      Update Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map_updates
+      Use Timestamp: false
+      Value: true
+    - Alpha: 0.45
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: true
+      Name: Global Costmap
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_costmap/costmap
+      Update Topic:
+        Depth: 1
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_costmap/costmap_updates
+      Use Timestamp: false
+      Value: true
+    - Alpha: 0.55
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
+      Enabled: true
+      Name: Local Costmap
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/costmap
+      Update Topic:
+        Depth: 1
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/costmap_updates
+      Use Timestamp: false
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 217; 58; 36
+      Enabled: true
+      Line Style: Lines
+      Name: Global Plan (A*)
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plan
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Polygon
+      Color: 255; 90; 70
+      Enabled: true
+      Name: Stop Zone
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /collision_monitor/stop_zone
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/LaserScan
+      Color: 56; 189; 248
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Name: Scan
+      Size (Pixels): 3
+      Size (m): 0.03
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /scan
+      Use Fixed Frame: true
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Alpha: 0.9
+      Collision Enabled: false
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Name: Robot
+      Visual Enabled: true
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Frames:
+        All Enabled: false
+        base_footprint:
+          Value: true
+        laser_link:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
+      Marker Scale: 0.4
+      Name: TF
+      Show Arrows: false
+      Show Axes: true
+      Show Names: true
+      Value: true
+  Enabled: true
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic:
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /goal_pose
+    - Class: rviz_default_plugins/Measure
+  Value: true
+  Views:
+    Current:
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Near Clip Distance: 0.01
+      Scale: 100
+      Target Frame: <Fixed Frame>
+      Value: TopDownOrtho (rviz_default_plugins)
+      X: 0.5
+      Y: 0
+    Saved: ~
+Window Geometry:
+  Height: 1000
+  Width: 1500
